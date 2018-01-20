@@ -9,10 +9,12 @@ fun eof() = let val pos = hd(!linePos) in Tokens.EOF(pos,pos) end
 
 
 %% 
+digits=[0-9]+;
 %%
-\n	=> (lineNum := !lineNum+1; linePos := yypos :: !linePos; continue());
-","	=> (Tokens.COMMA(yypos,yypos+1));
-var  	=> (Tokens.VAR(yypos,yypos+3));
-"123"	=> (Tokens.INT(123,yypos,yypos+3));
-.       => (ErrorMsg.error yypos ("illegal character " ^ yytext); continue());
+\n	            => (lineNum := !lineNum+1; linePos := yypos :: !linePos; continue());
+","	            => (Tokens.COMMA(yypos,yypos+1));
+var  	          => (Tokens.VAR(yypos,yypos+3));
+[+-]?{digits}   => (case Int.fromString(yytext) of
+                      SOME i => (Tokens.INT(i, yypos, yypos+3)));
+.               => (ErrorMsg.error yypos ("illegal character " ^ yytext); continue());
 
