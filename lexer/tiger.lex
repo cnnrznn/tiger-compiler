@@ -9,12 +9,10 @@ val legal_eof = ref true;
 
 fun eof() = let val pos = hd(!linePos)
               in
-                if !legal_eof then
-                  Tokens.EOF(pos,pos)
-                else (
-                  ErrorMsg.error pos ("open string or comment");
-                  Tokens.EOF(~1, ~1)
-                  )
+                ( if !legal_eof then ()
+                  else (ErrorMsg.error (hd(!linePos)) "open string or comment")
+                );
+                Tokens.EOF(!lineNum, hd(!linePos))
               end
                 
 
@@ -94,6 +92,7 @@ keywords = "function" | "break" | "of" | "end" | "in" | "nil" | "let" | "do" | "
 <COMMENT>"*/"            => (comlevel := !comlevel-1; if !comlevel = 0
                                                       then (YYBEGIN INITIAL; legal_eof := true; continue())
                                                       else continue());
+<COMMENT>\n	            => (lineNum := !lineNum+1; linePos := yypos :: !linePos; continue());
 <COMMENT>.               => (continue());
 
 <INITIAL>\"              => (YYBEGIN STRING; legal_eof := false; continue());
