@@ -5,7 +5,17 @@ val lineNum = ErrorMsg.lineNum
 val linePos = ErrorMsg.linePos
 fun err(p1,p2) = ErrorMsg.error p1
 
-fun eof() = let val pos = hd(!linePos) in Tokens.EOF(pos,pos) end
+val legal_eof = ref true;
+
+fun eof() = let val pos = hd(!linePos)
+              in
+                if !legal_eof then
+                  Tokens.EOF(pos,pos)
+                else (
+                  ErrorMsg.error pos ("open string or comment");
+                  Tokens.EOF(~1, ~1)
+                  )
+              end
 
 val comlevel = ref 0;
 
@@ -78,16 +88,16 @@ keywords = "function" | "break" | "of" | "end" | "in" | "nil" | "let" | "do" | "
 <INITIAL>\n	            => (lineNum := !lineNum+1; linePos := yypos :: !linePos; continue());
 <INITIAL>{digits}   => (case Int.fromString(yytext) of
                       SOME i => (Tokens.INT(i, yypos, yypos)));
-<INITIAL>"/*"            => (YYBEGIN COMMENT; comlevel := !comlevel+1; continue());
+<INITIAL>"/*"            => (YYBEGIN COMMENT; legal_eof := false; comlevel := !comlevel+1; continue());
 <COMMENT>"/*"            => (comlevel := !comlevel+1; continue());
 <COMMENT>"*/"            => (comlevel := !comlevel-1; if !comlevel = 0
-                                                      then (YYBEGIN INITIAL; continue())
+                                                      then (YYBEGIN INITIAL; legal_eof := true; continue())
                                                       else continue());
 <COMMENT>.               => (continue());
 
-<INITIAL>\"              => (YYBEGIN STRING; continue());
+<INITIAL>\"              => (YYBEGIN STRING; legal_eof := false; continue());
 <STRING>\\ 	         => (YYBEGIN ESC; continue());
-<STRING>\"	         => (strtmp := !strtok; strtok := ""; YYBEGIN INITIAL; Tokens.STRING(!strtmp, yypos, yypos));
+<STRING>\"	         => (strtmp := !strtok; strtok := ""; YYBEGIN INITIAL; legal_eof := true; Tokens.STRING(!strtmp, yypos, yypos));
 <STRING>.	         => (strtok := !strtok ^ yytext; continue());
 
 <ESC>{wss}+\\      => (YYBEGIN STRING; continue());
