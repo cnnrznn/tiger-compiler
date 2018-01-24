@@ -17,6 +17,7 @@ val strtmp = ref "";
 %s COMMENT STRING ESC;
 
 digits=[0-9]+;
+digit=[0-9];
 ws=[\ \t]+;
 letter=[a-zA-Z];
 sym= "," | ":" | ";" | "(" | ")" | "[" | "]" | "{" | "}" | "." | "+" | "-" | "*" | "/" | "=" | "<>" | "<" | ">" | "<=" | ">=" | "&" | "|" | ":=" ;
@@ -66,6 +67,13 @@ esc_char = "n" | "t";
 <STRING>\"	         => (strtmp := !strtok; strtok := ""; YYBEGIN INITIAL; Tokens.STRING(!strtmp, yypos, yypos));
 <STRING>.	         => (strtok := !strtok ^ yytext; continue());
 
+<ESC>{digit}{digit}{digit} => (case Int.fromString(yytext) of
+                                SOME i => ( if i < 128 then
+                                              (strtok := !strtok ^ (Char.toString(chr(i))); YYBEGIN STRING; continue())
+                                            else
+                                              (ErrorMsg.error yypos ("invalid ASCII \\" ^ yytext); continue())
+                                          )
+                                );
 <ESC>{esc_char}          => (strtok := !strtok ^ "\\" ^ yytext; YYBEGIN STRING; continue());
 <ESC>.                   => (print "illegal use in string literal"; continue());
 
