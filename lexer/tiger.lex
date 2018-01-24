@@ -16,6 +16,7 @@ fun eof() = let val pos = hd(!linePos)
                   Tokens.EOF(~1, ~1)
                   )
               end
+                
 
 val comlevel = ref 0;
 
@@ -98,6 +99,9 @@ keywords = "function" | "break" | "of" | "end" | "in" | "nil" | "let" | "do" | "
 <INITIAL>\"              => (YYBEGIN STRING; legal_eof := false; continue());
 <STRING>\\ 	         => (YYBEGIN ESC; continue());
 <STRING>\"	         => (strtmp := !strtok; strtok := ""; YYBEGIN INITIAL; legal_eof := true; Tokens.STRING(!strtmp, yypos, yypos));
+
+<STRING>\n               => (lineNum := !lineNum+1; linePos := yypos :: !linePos; ErrorMsg.error yypos ("illegal string"); YYBEGIN INITIAL; continue());
+
 <STRING>.	         => (strtok := !strtok ^ yytext; continue());
 
 <ESC>{wss}+\\      => (YYBEGIN STRING; continue());
