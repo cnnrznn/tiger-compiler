@@ -22,9 +22,31 @@ ws=[\ \t]+;
 wss=[\ \t\n\f];
 letter=[a-zA-Z];
 sym= "," | ":" | ";" | "(" | ")" | "[" | "]" | "{" | "}" | "." | "+" | "-" | "*" | "/" | "=" | "<>" | "<" | ">" | "<=" | ">=" | "&" | "|" | ":=" ;
-esc_char = n | t | \" | \\;
+esc_char = n | t | \" | \\ | "^C" | "^Z";
+
+keywords = "function" | "break" | "of" | "end" | "in" | "nil" | "let" | "do" | "to" | "for" | "while" | "else" | "then" | "if" | "array" ; 
+
 %%
-<INITIAL>var  	          => (Tokens.VAR(yypos,yypos+3));
+
+<INITIAL>{keywords}       =>(case yytext of
+			     "function" => Tokens.FUNCTION(yypos, yypos+8)
+                             | "break"  => Tokens.BREAK(yypos, yypos+5)
+			     | "of"     => Tokens.OF(yypos, yypos+2)
+			     | "end"    => Tokens.END(yypos, yypos+3)
+                             | "in"     => Tokens.IN(yypos, yypos+2)
+			     | "nil"    => Tokens.NIL(yypos, yypos+3)	
+                             | "let"    => Tokens.LET(yypos, yypos+3)
+			     | "do"     => Tokens.DO(yypos, yypos+2)
+			     | "to"     => Tokens.TO(yypos, yypos+2)
+			     | "for"    => Tokens.FOR(yypos, yypos+3)
+			     | "while"  => Tokens.WHILE(yypos, yypos+5)
+			     | "else"   => Tokens.ELSE(yypos, yypos+4)
+			     | "then"   => Tokens.THEN(yypos, yypos+4)
+			     | "if"     => Tokens.IF(yypos, yypos+2)
+			     | "array"  => Tokens.ARRAY(yypos, yypos+5)
+                              );
+
+<INITIAL>var  	         => (Tokens.VAR(yypos,yypos+3));
 <INITIAL>type            =>  (Tokens.TYPE(yypos,yypos));
 <INITIAL>{sym}           =>  (case yytext of
 				"," => Tokens.COMMA(yypos,yypos+1)
