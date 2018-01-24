@@ -19,9 +19,10 @@ val strtmp = ref "";
 digits=[0-9]+;
 digit=[0-9];
 ws=[\ \t]+;
+wss=[\ \t\n\f];
 letter=[a-zA-Z];
 sym= "," | ":" | ";" | "(" | ")" | "[" | "]" | "{" | "}" | "." | "+" | "-" | "*" | "/" | "=" | "<>" | "<" | ">" | "<=" | ">=" | "&" | "|" | ":=" ;
-esc_char = "n" | "t";
+esc_char = n | t | \" | \\;
 %%
 <INITIAL>var  	          => (Tokens.VAR(yypos,yypos+3));
 <INITIAL>type            =>  (Tokens.TYPE(yypos,yypos));
@@ -67,6 +68,7 @@ esc_char = "n" | "t";
 <STRING>\"	         => (strtmp := !strtok; strtok := ""; YYBEGIN INITIAL; Tokens.STRING(!strtmp, yypos, yypos));
 <STRING>.	         => (strtok := !strtok ^ yytext; continue());
 
+<ESC>{wss}+\\      => (YYBEGIN STRING; continue());
 <ESC>{digit}{digit}{digit} => (case Int.fromString(yytext) of
                                 SOME i => ( if i < 128 then
                                               (strtok := !strtok ^ (Char.toString(chr(i))); YYBEGIN STRING; continue())
@@ -75,7 +77,7 @@ esc_char = "n" | "t";
                                           )
                                 );
 <ESC>{esc_char}          => (strtok := !strtok ^ "\\" ^ yytext; YYBEGIN STRING; continue());
-<ESC>.                   => (print "illegal use in string literal"; continue());
+<ESC>.                   => (ErrorMsg.error yypos ("illegal use in string literal " ^ yytext); continue());
 
 .           => (ErrorMsg.error yypos ("illegal character " ^ yytext); continue());
 
