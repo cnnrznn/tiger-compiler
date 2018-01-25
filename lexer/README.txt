@@ -32,7 +32,11 @@ Errors:
     - formatting sequences that are not "closed", i.e."(non-formatting characters)\fff(formatting characters)fff...(non-formating characters)"
     - any character that is not a valid escape character, e.g. "\y" is not legal
 
-EOF:
+EOF: 
+  End of File is detected by matching the last new line character "\n"  in the file and can occur in one of the following states
+  - INITIAL : If EOF appears in this state it is considered legal and we return the line number and the total number of chracaters in the file.
+  - STRING : If EOF appears while the lexer is in STRING state, it is marked not-legal and reported as an error ("open string/comment").
+  - COMMENT : If EOF appears in this state, it is marked not-legal and reported as an error ("open string/ comment"). 
 
 ADDITIONAL:
   We added two additional tokens to accomodate the tiger built-in types 'int' and string'.
