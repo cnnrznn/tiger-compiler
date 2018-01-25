@@ -4,6 +4,8 @@ let
 	var arr1:arrtype := arrtype [10] of 0
 in
 	arr1 
-	"this is a string \t"
-"another st;ring"
-end
+  "this is a string"
+  "another \
+    \string \
+    kk"
+end 

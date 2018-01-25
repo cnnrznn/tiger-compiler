@@ -33,12 +33,14 @@ letter=[a-zA-Z];
 sym= "," | ":" | ";" | "(" | ")" | "[" | "]" | "{" | "}" | "." | "+" | "-" | "*" | "/" | "=" | "<>" | "<" | ">" | "<=" | ">=" | "&" | "|" | ":=" ;
 esc_char = n | t | \" | \\ | "^C" | "^Z";
 
-keywords = "function" | "break" | "of" | "end" | "in" | "nil" | "let" | "do" | "to" | "for" | "while" | "else" | "then" | "if" | "array" ; 
+keywords = "int" | "string" | "function" | "break" | "of" | "end" | "in" | "nil" | "let" | "do" | "to" | "for" | "while" | "else" | "then" | "if" | "array" ; 
 
 %%
 
 <INITIAL>{keywords}       =>(case yytext of
-			     "function" => Tokens.FUNCTION(!lineNum,(yypos - hd(!linePos)))
+          "int"       => Tokens.TYPE_INT(!lineNum, (yypos - hd(!linePos)))
+          | "string"  => Tokens.TYPE_STR(!lineNum, (yypos - hd(!linePos)))
+			     |"function" => Tokens.FUNCTION(!lineNum,(yypos - hd(!linePos)))
                              | "break"  => Tokens.BREAK(!lineNum,(yypos - hd(!linePos)))
 			     | "of"     => Tokens.OF(!lineNum,(yypos - hd(!linePos)))
 			     | "end"    => Tokens.END(!lineNum,(yypos - hd(!linePos)))

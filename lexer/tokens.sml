@@ -5,7 +5,7 @@ struct
 type linenum = int
 type token = string
 fun TYPE_INT(i,j) = "TYPE_INT " ^ Int.toString(i) ^ "   " ^ Int.toString(j)
-fun TYPE_STRING(i, j) = "TYPE_STRING " ^ Int.toString(i) ^ "   " ^ Int.toString(j)
+fun TYPE_STR(i, j) = "TYPE_STR " ^ Int.toString(i) ^ "   " ^ Int.toString(j)
 fun TYPE(i,j) = "TYPE   " ^ Int.toString(i) ^ "   " ^ Int.toString(j)
 fun VAR(i,j) = "VAR   " ^ Int.toString(i) ^ "   " ^ Int.toString(j)
 fun FUNCTION(i,j) = "FUNCTION   " ^ Int.toString(i) ^ "   " ^ Int.toString(j)
@@ -50,5 +50,4 @@ fun STRING(s,i,j) = "STRING("^s^")     " ^ Int.toString(i) ^ "   " ^ Int.toStrin
 fun INT(c,i,j) = "INT("^Int.toString(c)^")   " ^ Int.toString(i) ^ "   " ^ Int.toString(j)
 fun ID(s,i,j) = "ID("^s^")     " ^ Int.toString(i) ^ "   " ^ Int.toString(j)
 fun EOF(i,j) = "EOF   " ^ Int.toString(i) ^ "   " ^ Int.toString(j)
->>>>>>> c0b050c1962e559a39fec8bf0ae0db480792096a
 end
