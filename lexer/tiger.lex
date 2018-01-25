@@ -123,10 +123,13 @@ keywords = "int" | "string" | "function" | "break" | "of" | "end" | "in" | "nil"
                         continue());
 <ESC>{digit}{digit}{digit} => (case Int.fromString(yytext) of
                                 SOME i => ( YYBEGIN STRING;
+                                            strtok := !strtok ^ (Char.toString(chr(i)));
                                             if i < 128 then
-                                              (strtok := !strtok ^ (Char.toString(chr(i))); continue())
+                                              ()
                                             else
-                                              (ErrorMsg.error yypos ("invalid ASCII \\" ^ yytext); continue())
+                                              (ErrorMsg.error yypos ("invalid ASCII \\" ^ yytext))
+                                            ;
+                                            continue()
                                           )
                               );
 <ESC>{esc_char}     => (strtok := !strtok ^ "\\" ^ yytext; YYBEGIN STRING; continue());
