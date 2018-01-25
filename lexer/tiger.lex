@@ -94,43 +94,43 @@ keywords = "int" | "string" | "function" | "break" | "of" | "end" | "in" | "nil"
 				| "|" => Tokens.OR(!lineNum,(yypos - hd(!linePos)))
 				| ":=" => Tokens.ASSIGN(!lineNum,(yypos - hd(!linePos))));
 
-<INITIAL>{ws}             => (continue());
-<INITIAL>{letter}({digits}|{letter}|_)* => (Tokens.ID(yytext, !lineNum,(yypos - hd(!linePos))));
-<INITIAL>\n	            => (lineNum := !lineNum+1; linePos := yypos :: !linePos; continue());
+<INITIAL>{letter}({digits}|{letter}|_)*   => (Tokens.ID(yytext, !lineNum,(yypos - hd(!linePos))));
+<INITIAL>{ws}       => (continue());
+<INITIAL>\n	        => (lineNum := !lineNum+1; linePos := yypos :: !linePos; continue());
 <INITIAL>{digits}   => (case Int.fromString(yytext) of
-                      SOME i => (Tokens.INT(i, !lineNum,(yypos - hd(!linePos)))));
-<INITIAL>"/*"            => (YYBEGIN COMMENT; legal_eof := false; comlevel := !comlevel+1; continue());
-<COMMENT>"/*"            => (comlevel := !comlevel+1; continue());
-<COMMENT>"*/"            => (comlevel := !comlevel-1; if !comlevel = 0
-                                                      then (YYBEGIN INITIAL; legal_eof := true; continue())
-                                                      else continue());
-<COMMENT>\n	            => (lineNum := !lineNum+1; linePos := yypos :: !linePos; continue());
-<COMMENT>.               => (continue());
+                          SOME i => (Tokens.INT(i, !lineNum,(yypos - hd(!linePos)))));
+<INITIAL>"/*"       => (YYBEGIN COMMENT; legal_eof := false; comlevel := !comlevel+1; continue());
+<INITIAL>\"         => (YYBEGIN STRING; legal_eof := false; continue());
 
-<INITIAL>\"              => (YYBEGIN STRING; legal_eof := false; continue());
-<STRING>\\ 	         => (YYBEGIN ESC; continue());
-<STRING>\"	         => (strtmp := !strtok; strtok := ""; YYBEGIN INITIAL; legal_eof := true; Tokens.STRING(!strtmp, !lineNum,(yypos - hd(!linePos))));
+<COMMENT>"/*"       => (comlevel := !comlevel+1; continue());
+<COMMENT>"*/"       => (comlevel := !comlevel-1; if !comlevel = 0
+                          then (YYBEGIN INITIAL; legal_eof := true; continue())
+                          else continue());
+<COMMENT>\n	        => (lineNum := !lineNum+1; linePos := yypos :: !linePos; continue());
+<COMMENT>.          => (continue());
 
-<STRING>\n               => (lineNum := !lineNum+1; linePos := yypos :: !linePos; ErrorMsg.error yypos ("illegal string"); YYBEGIN INITIAL; continue());
+<STRING>\"	        => (strtmp := !strtok; strtok := ""; YYBEGIN INITIAL; legal_eof := true; Tokens.STRING(!strtmp, !lineNum,(yypos - hd(!linePos))));
+<STRING>\n          => (lineNum := !lineNum+1; linePos := yypos :: !linePos; ErrorMsg.error yypos ("line break needed in string"); continue());
+<STRING>\\ 	        => (YYBEGIN ESC; continue());
+<STRING>.	          => (strtok := !strtok ^ yytext; continue());
 
-<STRING>.	         => (strtok := !strtok ^ yytext; continue());
-
-<ESC>{wss}+        => (YYBEGIN STRING;
-                        ErrorMsg.error (yypos-1) ("bad line break");
+<ESC>{wss}+         => (YYBEGIN STRING;
+                        ErrorMsg.error (yypos-1) ("unclosed line break");
                         update_pos(yytext, yypos, 0);
                         continue());
-<ESC>{wss}+\\      => (YYBEGIN STRING;
+<ESC>{wss}+\\       => (YYBEGIN STRING;
                         update_pos(yytext, yypos, 0);
                         continue());
 <ESC>{digit}{digit}{digit} => (case Int.fromString(yytext) of
-                                SOME i => ( if i < 128 then
-                                              (strtok := !strtok ^ (Char.toString(chr(i))); YYBEGIN STRING; continue())
+                                SOME i => ( YYBEGIN STRING;
+                                            if i < 128 then
+                                              (strtok := !strtok ^ (Char.toString(chr(i))); continue())
                                             else
                                               (ErrorMsg.error yypos ("invalid ASCII \\" ^ yytext); continue())
                                           )
-                                );
-<ESC>{esc_char}          => (strtok := !strtok ^ "\\" ^ yytext; YYBEGIN STRING; continue());
-<ESC>.                   => (ErrorMsg.error yypos ("illegal use in string literal " ^ yytext); continue());
+                              );
+<ESC>{esc_char}     => (strtok := !strtok ^ "\\" ^ yytext; YYBEGIN STRING; continue());
+<ESC>.              => (ErrorMsg.error yypos ("illegal use in string literal " ^ yytext); continue());
 
 .           => (ErrorMsg.error yypos ("illegal character " ^ yytext); continue());
 
