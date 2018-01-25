@@ -21,6 +21,16 @@ val comlevel = ref 0;
 val strtok = ref "";
 val strtmp = ref "";
 
+fun update_pos(str:string, start:int, off:int):unit =
+  let
+    val c = String.sub(str, off);
+  in
+    (if Char.toString c = "\\n" then
+      (lineNum := !lineNum+1; linePos := start+off :: !linePos)
+    else ());
+    (if off+1 < String.size str then update_pos(str, start, off+1)
+    else ())
+  end
 
 %% 
 %s COMMENT STRING ESC;
@@ -105,7 +115,13 @@ keywords = "int" | "string" | "function" | "break" | "of" | "end" | "in" | "nil"
 
 <STRING>.	         => (strtok := !strtok ^ yytext; continue());
 
-<ESC>{wss}+\\      => (YYBEGIN STRING; continue());
+<ESC>{wss}+        => (YYBEGIN STRING;
+                        ErrorMsg.error (yypos-1) ("bad line break");
+                        update_pos(yytext, yypos, 0);
+                        continue());
+<ESC>{wss}+\\      => (YYBEGIN STRING;
+                        update_pos(yytext, yypos, 0);
+                        continue());
 <ESC>{digit}{digit}{digit} => (case Int.fromString(yytext) of
                                 SOME i => ( if i < 128 then
                                               (strtok := !strtok ^ (Char.toString(chr(i))); YYBEGIN STRING; continue())
