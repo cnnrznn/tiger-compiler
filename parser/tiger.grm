@@ -11,7 +11,15 @@
   | BREAK | NIL
   | FUNCTION | VAR | TYPE 
 
-%nonterm  exp | program
+%nonterm  exp
+        | program
+        | declist
+        | typedec
+        | fundec
+        | vardec
+        | type
+        | typef
+        | typeflist
 
 %pos int
 %verbose
@@ -41,3 +49,19 @@ program	: exp				()
 
 	
 exp: 			()
+
+declist: typedec declist        ()
+        |vardec declist         ()
+        |fundec declist         ()
+        |                       ()
+
+typedec: TYPE ID EQ type        ()
+
+type:    ID                     ()
+        | LBRACE typef RBRACE   ()
+        | ARRAY OF ID           ()
+
+typef:   ID COLON ID typeflist  ()
+        |                       ()
+typeflist:      COMMA ID COLON ID typeflist     ()
+        |                                       ()
