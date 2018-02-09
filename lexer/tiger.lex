@@ -1,5 +1,7 @@
 type pos = int
-type lexresult = Tokens.token
+type svalue = Tokens.svalue
+type ('a, 'b) token = ('a, 'b) Tokens.token
+type lexresult = (svalue,pos) token
 
 val lineNum = ErrorMsg.lineNum
 val linePos = ErrorMsg.linePos
@@ -33,6 +35,8 @@ fun update_pos(str:string, start:int, off:int):unit =
   end
 
 %% 
+%header (functor TigerLexFun(structure Tokens: Tiger_TOKENS));
+
 %s COMMENT STRING ESC;
 
 digits=[0-9]+;
@@ -43,14 +47,12 @@ letter=[a-zA-Z];
 sym= "," | ":" | ";" | "(" | ")" | "[" | "]" | "{" | "}" | "." | "+" | "-" | "*" | "/" | "=" | "<>" | "<" | ">" | "<=" | ">=" | "&" | "|" | ":=" ;
 esc_char = n | t | \" | \\ | "^C" | "^Z";
 
-keywords = "int" | "string" | "function" | "break" | "of" | "end" | "in" | "nil" | "let" | "do" | "to" | "for" | "while" | "else" | "then" | "if" | "array" ; 
+keywords = "function" | "break" | "of" | "end" | "in" | "nil" | "let" | "do" | "to" | "for" | "while" | "else" | "then" | "if" | "array" ; 
 
 %%
 
 <INITIAL>{keywords}       =>(case yytext of
-          "int"           => Tokens.TYPE_INT(!lineNum, (yypos - hd(!linePos)))
-          | "string"      => Tokens.TYPE_STR(!lineNum, (yypos - hd(!linePos)))
-			    |"function"     => Tokens.FUNCTION(!lineNum,(yypos - hd(!linePos)))
+        "function"     => Tokens.FUNCTION(!lineNum,(yypos - hd(!linePos)))
           | "break"       => Tokens.BREAK(!lineNum,(yypos - hd(!linePos)))
 			    | "of"          => Tokens.OF(!lineNum,(yypos - hd(!linePos)))
 			    | "end"         => Tokens.END(!lineNum,(yypos - hd(!linePos)))
