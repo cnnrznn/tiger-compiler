@@ -5,8 +5,8 @@ errormsg.sml
 table.sig
 table.sml
 symbol.sml
-parse.sml
-tiger.lex
+parsetest.sml
+../lexer/tiger.lex
 tiger.grm
 $/ml-yacc-lib.cm
 $/smlnj-lib.cm
