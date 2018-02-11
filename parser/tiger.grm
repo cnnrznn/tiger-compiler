@@ -13,13 +13,36 @@
 
 %nonterm  exp
         | program
-        | declist
+        | lValue
+        | seqExp
+        | negation
+        | callExp
+        | infixExp
+        | arrCreate
+        | recCreate
+        | assignment
+        | ifThenElse
+        | ifThen
+        | whileExp
+        | forExp
+        | letExp
+        | expParamNext
+        | paramList
+        | fieldCreate
+        | fieldCreateNext
+        | expList
+        | expListNext
+        | decList
+        | decListNext
+        | seqExpNext
+        | subscript
+        | fieldExp
         | typedec
-        | fundec
-        | vardec
         | type
         | typef
         | typeflist
+        | fundec
+        | vardec
 
 %pos int
 %verbose
@@ -47,14 +70,91 @@
 
 program	: exp           ()
 
-	
+(* can exp produce empty? *)
 exp: 			()
-        | declist       ()
+        | lValue        ()
+        | NIL           ()
+        | INT           ()
+        | STRING        ()
+        | seqExp        ()
+        | negation      ()
+        | callExp       ()
+        | infixExp      ()
+        | arrCreate     ()
+        | recCreate     ()
+        | assignment    ()
+        | ifThenElse    ()
+        | ifThen        ()
+        | whileExp      ()
+        | forExp        ()
+        | BREAK         ()
+        | letExp        ()
 
-declist: typedec declist        ()
+(********************************************************)
+(* Some useful functions for working with different     *)
+(* sequences of expressions.                            *)
+
+paramList:
+        exp expParamNext        ()
+        |                       ()
+expParamNext:
+        COMMA exp expParamNext  ()
+        |                       ()
+
+fieldCreate:
+        ID EQ exp fieldCreateNext       ()
+        |                               ()
+fieldCreateNext:
+        COMMA ID EQ exp fieldCreateNext ()
+        |                               ()
+
+expList:
+        exp expListNext         ()
+        |                       ()
+expListNext:
+        SEMICOLON exp expListNext       ()
+        |                               ()
+
+decList:
+        dec decListNext         ()
+decListNext:
+        dec decListNext         ()
+        |                       ()
+
+(*************************************************************)
+(* A sequential expression is a sequence of 0 or more   *)
+(* expressions enclosed in parentheses and sparated     *)
+(* by semi-colons.                                      *)
+
+seqExp:
+        LPAREN RPAREN ()
+        | LPAREN exp seqExpNext RPAREN      ()
+seqExpNext:
+        SEMICOLON exp expNext  ()
+        |               ()
+
+(********************************************************)
+(* The left-side of an assignment statemnt. Can come    *)
+(* from a plain ID, the index of an array, or a field   *)
+(* specifier, as in a struct.                           *)
+
+lValue: ID      ()
+        | subscript     ()
+        | fieldExp      ()
+subscript:
+        lValue LBRACK exp RBRACK        ()
+fieldExp:
+        lValue DOT ID   ()
+
+(********************************************************)
+(* A declaration can be for a type, a variable, or a    *)
+(* function. We may expect 0 or more of these at a      *)
+(* time.                                                *)
+
+dec:
+        typedec declist        ()
         |vardec declist         ()
         |fundec declist         ()
-        |                       ()
 
 typedec: TYPE ID EQ type        ()
 
@@ -66,3 +166,65 @@ typef:   ID COLON ID typeflist  ()
         |                       ()
 typeflist:      COMMA ID COLON ID typeflist     ()
         |                                       ()
+
+fundec:
+      FUNCTION ID LPAREN typef RPAREN EQ exp            ()
+    | FUNCTION ID LPAREN typef RPAREN COLON ID EQ exp   ()
+
+vardec:
+      VAR ID ASSIGN exp         ()
+    | VAR ID COLON ID ASSIGN exp        ()
+
+
+(********************************************************)
+(* Negation of an expression is multiplication by -1.   *)
+
+negation:
+        MINUS exp       ()
+
+callExp:
+        ID LPAREN paramList RPAREN    ()
+
+(********************************************************)
+(* These are binary operators.                          *)
+infixExp:
+        exp PLUS exp    ()
+        | exp MINUS exp    ()
+        | exp TIMES exp    ()
+        | exp DIVIDE exp    ()
+        | exp EQ exp    ()
+        | exp NEQ exp    ()
+        | exp LT exp    ()
+        | exp LE exp    ()
+        | exp GT exp    ()
+        | exp GE exp    ()
+        | exp AND exp    ()
+        | exp OR exp    ()
+
+arrCreate:
+        ID LBRACK exp RBRACK OF exp     ()
+
+recCreate:
+        ID LBRACE fieldCreate RBRACE    ()
+
+assignment:
+        ID ASSIGN exp   ()
+
+
+(********************************************************)
+(* Branching instructions                               *)
+
+ifThenElse:
+        IF exp THEN exp ELSE exp        ()
+
+ifThen:
+        IF exp THEN exp                 ()
+
+whileExp:
+        WHILE exp DO exp                ()
+
+forExp:
+        FOR ID ASSIGN exp TO exp DO exp ()
+
+letExp:
+        LET decList IN expList END              ()
