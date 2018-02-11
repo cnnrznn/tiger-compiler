@@ -43,6 +43,7 @@
         | typeflist
         | fundec
         | vardec
+        | dec
 
 %pos int
 %verbose
@@ -130,7 +131,7 @@ seqExp:
         LPAREN RPAREN ()
         | LPAREN exp seqExpNext RPAREN      ()
 seqExpNext:
-        SEMICOLON exp expNext  ()
+        SEMICOLON exp seqExpNext  ()
         |               ()
 
 (********************************************************)
@@ -152,9 +153,9 @@ fieldExp:
 (* time.                                                *)
 
 dec:
-        typedec declist        ()
-        |vardec declist         ()
-        |fundec declist         ()
+        typedec         ()
+        |vardec          ()
+        |fundec          ()
 
 typedec: TYPE ID EQ type        ()
 
