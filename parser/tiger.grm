@@ -28,12 +28,12 @@
         | letExp
         | expParamNext
         | paramList
+        | paramListOpt
         | fieldCreate
         | fieldCreateNext
         | expList
-        | expListNext
+        | expListOpt
         | decList
-        | decListNext
         | seqExpNext
         | subscript
         | fieldExp
@@ -72,15 +72,15 @@
 program	: exp           ()
 
 (* can exp produce empty? *)
-exp: 			()
-        | lValue        ()
+exp:
+        lValue        ()
         | NIL           ()
         | INT           ()
         | STRING        ()
         | seqExp        ()
-        | negation      ()
         | callExp       ()
         | infixExp      ()
+        | negation      ()
         | arrCreate     ()
         | recCreate     ()
         | assignment    ()
@@ -95,12 +95,11 @@ exp: 			()
 (* Some useful functions for working with different     *)
 (* sequences of expressions.                            *)
 
+paramListOpt:                   ()
+        | paramList             ()
 paramList:
-        exp expParamNext        ()
-        |                       ()
-expParamNext:
-        COMMA exp expParamNext  ()
-        |                       ()
+        exp                     ()
+        | paramList COMMA exp   ()
 
 fieldCreate:
         ID EQ exp fieldCreateNext       ()
@@ -109,18 +108,15 @@ fieldCreateNext:
         COMMA ID EQ exp fieldCreateNext ()
         |                               ()
 
+expListOpt:             ()
+        | expList       ()
 expList:
-        exp expListNext         ()
-        |                       ()
-expListNext:
-        SEMICOLON exp expListNext       ()
-        |                               ()
+        exp                             ()
+        | expList SEMICOLON exp         ()
 
 decList:
-        dec decListNext         ()
-decListNext:
-        dec decListNext         ()
-        |                       ()
+        dec                     ()
+        | decList dec           ()
 
 (*************************************************************)
 (* A sequential expression is a sequence of 0 or more   *)
@@ -184,7 +180,7 @@ negation:
         MINUS exp       ()
 
 callExp:
-        ID LPAREN paramList RPAREN    ()
+        ID LPAREN paramListOpt RPAREN    ()
 
 (********************************************************)
 (* These are binary operators.                          *)
@@ -228,4 +224,4 @@ forExp:
         FOR ID ASSIGN exp TO exp DO exp ()
 
 letExp:
-        LET decList IN expList END              ()
+        LET decList IN expListOpt END              ()
