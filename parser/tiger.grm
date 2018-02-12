@@ -15,6 +15,7 @@
         | program
         | lValue
         | seqExp
+        | seqExpList
         | negation
         | callExp
         | infixExp
@@ -29,12 +30,11 @@
         | expParamNext
         | paramList
         | paramListOpt
-        | fieldCreate
-        | fieldCreateNext
+        | fieldCreateOpt
+        | fieldCreateList
         | expList
         | expListOpt
         | decList
-        | seqExpNext
         | subscript
         | fieldExp
         | typedec
@@ -73,7 +73,7 @@ program	: exp           ()
 
 (* can exp produce empty? *)
 exp:
-        lValue        ()
+        lValue          ()
         | NIL           ()
         | INT           ()
         | STRING        ()
@@ -95,28 +95,30 @@ exp:
 (* Some useful functions for working with different     *)
 (* sequences of expressions.                            *)
 
-paramListOpt:                   ()
-        | paramList             ()
+paramListOpt:
+        paramList exp           ()
+        |                       ()
 paramList:
-        exp                     ()
-        | paramList COMMA exp   ()
+        paramList exp COMMA     ()
+        |                       ()
 
-fieldCreate:
-        ID EQ exp fieldCreateNext       ()
+fieldCreateOpt:
+        fieldCreateList ID EQ exp       ()
         |                               ()
-fieldCreateNext:
-        COMMA ID EQ exp fieldCreateNext ()
+fieldCreateList:
+        fieldCreateList ID EQ exp COMMA ()
         |                               ()
 
-expListOpt:             ()
-        | expList       ()
+expListOpt:
+        expList exp     ()
+        |               ()
 expList:
-        exp                             ()
-        | expList SEMICOLON exp         ()
+        expList exp SEMICOLON           ()
+        |                               ()
 
 decList:
-        dec                     ()
-        | decList dec           ()
+        decList dec             ()
+        |                       ()
 
 (*************************************************************)
 (* A sequential expression is a sequence of 0 or more   *)
@@ -124,11 +126,11 @@ decList:
 (* by semi-colons.                                      *)
 
 seqExp:
-        LPAREN RPAREN ()
-        | LPAREN exp seqExpNext RPAREN      ()
-seqExpNext:
-        SEMICOLON exp seqExpNext  ()
-        |               ()
+        LPAREN RPAREN                   ()
+        | LPAREN seqExpList exp RPAREN  ()
+seqExpList:
+        seqExpList exp SEMICOLON        ()
+        |                               ()
 
 (********************************************************)
 (* The left-side of an assignment statemnt. Can come    *)
@@ -159,10 +161,12 @@ type:    ID                     ()
         | LBRACE typef RBRACE   ()
         | ARRAY OF ID           ()
 
-typef:   ID COLON ID typeflist  ()
-        |                       ()
-typeflist:      COMMA ID COLON ID typeflist     ()
-        |                                       ()
+typef:
+        typeflist ID COLON ID           ()
+        |                               ()
+typeflist:
+        typeflist ID COLON ID COMMA     ()
+        |                               ()
 
 fundec:
       FUNCTION ID LPAREN typef RPAREN EQ exp            ()
@@ -202,7 +206,7 @@ arrCreate:
         ID LBRACK exp RBRACK OF exp     ()
 
 recCreate:
-        ID LBRACE fieldCreate RBRACE    ()
+        ID LBRACE fieldCreateOpt RBRACE    ()
 
 assignment:
         ID ASSIGN exp   ()
