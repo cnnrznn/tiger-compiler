@@ -13,14 +13,11 @@
 
 %nonterm  exp
         | program
-        | lValue
         | seqExp
         | seqExpList
         | callExp
         | infixExp
-        | arrCreate
         | recCreate
-        | assignment
         | ifThenElse
         | ifThen
         | whileExp
@@ -42,6 +39,11 @@
         | fundec
         | vardec
         | dec
+        | ssList
+        | brackExpBeg
+        | brackExpEnd
+        | assignOpt
+        | dotExp
 
 %pos int
 %verbose
@@ -79,7 +81,8 @@ program	: exp           ()
 
 (* can exp produce empty? *)
 exp:
-        lValue          ()
+        brackExpBeg     ()
+        | dotExp        ()
         | NIL           ()
         | INT           ()
         | STRING        ()
@@ -87,9 +90,7 @@ exp:
         | MINUS exp    %prec UMINUS     ()
         | callExp       ()
         | infixExp      ()
-        | arrCreate     ()
         | recCreate     ()
-        | assignment    ()
         | ifThenElse    ()
         | ifThen        ()
         | whileExp      ()
@@ -144,13 +145,27 @@ seqExpList:
 (* from a plain ID, the index of an array, or a field   *)
 (* specifier, as in a struct.                           *)
 
-lValue: ID              ()
-        | subscript     ()
-        | fieldExp      ()
+dotExp:
+        ID DOT ID ssList assignOpt      ()
+
+brackExpBeg:
+        ID subscript brackExpEnd        ()
+
+brackExpEnd:
+        OF exp                          ()
+        | ssList assignOpt              ()
+
 subscript:
-        lValue LBRACK exp RBRACK        ()
-fieldExp:
-        lValue DOT ID   ()
+        LBRACK exp RBRACK       ()
+
+ssList:
+        ssList DOT ID           ()
+        | ssList subscript      ()
+        |                       ()
+
+assignOpt:
+        ASSIGN exp              ()
+        |                       ()
 
 (********************************************************)
 (* A declaration can be for a type, a variable, or a    *)
@@ -212,13 +227,6 @@ infixExp:
 
 recCreate:
         ID LBRACE fieldCreateOpt RBRACE    ()
-
-arrCreate:
-        ID LBRACK exp RBRACK OF exp     ()
-
-assignment:
-        lValue ASSIGN exp   ()
-
 
 (********************************************************)
 (* Branching instructions                               *)
