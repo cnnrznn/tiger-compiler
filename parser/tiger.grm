@@ -208,7 +208,7 @@ recCreate:
         ID LBRACE fieldCreateOpt RBRACE    ()
 
 assignment:
-        ID ASSIGN exp   ()
+        lValue ASSIGN exp   ()
 
 
 (********************************************************)
