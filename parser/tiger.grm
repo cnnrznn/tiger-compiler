@@ -13,11 +13,14 @@
 
 %nonterm  exp
         | program
+        | lValue
         | seqExp
         | seqExpList
         | callExp
         | infixExp
+        | arrCreate
         | recCreate
+        | assignment
         | ifThenElse
         | ifThen
         | whileExp
@@ -39,11 +42,7 @@
         | fundec
         | vardec
         | dec
-        | ssList
-        | brackExpBeg
-        | brackExpEnd
-        | assignOpt
-        | dotExp
+        | inter
 
 %pos int
 %verbose
@@ -56,7 +55,9 @@
 %keyword WHILE FOR TO BREAK LET IN END FUNCTION VAR TYPE ARRAY IF THEN ELSE 
 	DO OF NIL
 
-%nonassoc OF DO ELSE THEN
+
+%nonassoc THEN
+%nonassoc OF DO ELSE 
 %nonassoc ASSIGN
 %left AND OR
 %nonassoc EQ NEQ GE GT LE LT
@@ -81,8 +82,7 @@ program	: exp           ()
 
 (* can exp produce empty? *)
 exp:
-        brackExpBeg     ()
-        | dotExp        ()
+        lValue          ()
         | NIL           ()
         | INT           ()
         | STRING        ()
@@ -90,7 +90,9 @@ exp:
         | MINUS exp    %prec UMINUS     ()
         | callExp       ()
         | infixExp      ()
+        | arrCreate     ()
         | recCreate     ()
+        | assignment    ()
         | ifThenElse    ()
         | ifThen        ()
         | whileExp      ()
@@ -145,27 +147,16 @@ seqExpList:
 (* from a plain ID, the index of an array, or a field   *)
 (* specifier, as in a struct.                           *)
 
-dotExp:
-        ID DOT ID ssList assignOpt      ()
-
-brackExpBeg:
-        ID subscript brackExpEnd        ()
-
-brackExpEnd:
-        OF exp                          ()
-        | ssList assignOpt              ()
-
+lValue: ID              ()
+        | inter         ()
+inter : subscript     ()
+        | fieldExp    ()
+        
 subscript:
-        LBRACK exp RBRACK       ()
-
-ssList:
-        ssList DOT ID           ()
-        | ssList subscript      ()
-        |                       ()
-
-assignOpt:
-        ASSIGN exp              ()
-        |                       ()
+        ID LBRACK exp RBRACK        ()
+        | inter LBRACK exp RBRACK   ()
+fieldExp:
+        lValue DOT ID   ()
 
 (********************************************************)
 (* A declaration can be for a type, a variable, or a    *)
@@ -227,6 +218,13 @@ infixExp:
 
 recCreate:
         ID LBRACE fieldCreateOpt RBRACE    ()
+
+arrCreate:
+        ID LBRACK exp RBRACK OF exp     ()
+
+assignment:
+        lValue ASSIGN exp   ()
+
 
 (********************************************************)
 (* Branching instructions                               *)
