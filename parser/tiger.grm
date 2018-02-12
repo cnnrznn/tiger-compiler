@@ -6,7 +6,7 @@
   | COMMA | COLON | SEMICOLON | LPAREN | RPAREN | LBRACK | RBRACK 
   | LBRACE | RBRACE | DOT 
   | PLUS | MINUS | TIMES | DIVIDE | EQ | NEQ | LT | LE | GT | GE
-  | AND | OR | ASSIGN
+  | AND | OR | ASSIGN | UMINUS
   | ARRAY | IF | THEN | ELSE | WHILE | FOR | TO | DO | LET | IN | END | OF 
   | BREAK | NIL
   | FUNCTION | VAR | TYPE
@@ -16,7 +16,6 @@
         | lValue
         | seqExp
         | seqExpList
-        | negation
         | callExp
         | infixExp
         | arrCreate
@@ -55,6 +54,13 @@
 %keyword WHILE FOR TO BREAK LET IN END FUNCTION VAR TYPE ARRAY IF THEN ELSE 
 	DO OF NIL
 
+%nonassoc ASSIGN
+%left AND OR
+%nonassoc EQ NEQ GE GT LE LT
+%left PLUS MINUS
+%left TIMES DIVIDE
+%left UMINUS
+
 %prefer THEN ELSE LPAREN
 
 %value ID ("bogus")
@@ -77,7 +83,7 @@ exp:
         | INT           ()
         | STRING        ()
         | seqExp        ()
-        | negation      ()
+        | MINUS exp    %prec UMINUS     ()
         | callExp       ()
         | infixExp      ()
         | arrCreate     ()
@@ -179,8 +185,8 @@ vardec:
 (********************************************************)
 (* Negation of an expression is multiplication by -1.   *)
 
-negation:
-        MINUS exp       ()
+ (*  negation:        *)
+        (* MINUS exp       () *) 
 
 callExp:
         ID LPAREN paramListOpt RPAREN    ()
