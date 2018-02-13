@@ -98,7 +98,7 @@ exp:
         | ifThen        (ifThen)
         | whileExp      (whileExp)
         | forExp        (forExp)
-        | BREAK         ()
+        | BREAK         (A.BreakExp(BREAKleft))
         | letExp        (letExp)
 
 (********************************************************)
@@ -128,7 +128,7 @@ expList:
 
 decList:
         decList dec             ()
-        |                       ()
+        |                       (nil)
 
 (*************************************************************)
 (* A sequential expression is a sequence of 0 or more   *)
