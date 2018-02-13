@@ -12,9 +12,9 @@ val legal_eof = ref true;
 fun eof() = let val pos = hd(!linePos)
               in
                 ( if !legal_eof then ()
-                  else (ErrorMsg.error (hd(!linePos)) "open string or comment")
+                  else (ErrorMsg.error (pos) "open string or comment")
                 );
-                Tokens.EOF(!lineNum, hd(!linePos))
+                Tokens.EOF(pos, pos)
               end
                 
 
@@ -52,55 +52,55 @@ keywords = "function" | "break" | "of" | "end" | "in" | "nil" | "let" | "do" | "
 %%
 
 <INITIAL>{keywords}       =>(case yytext of
-        "function"     => Tokens.FUNCTION(!lineNum,(yypos - hd(!linePos)))
-          | "break"       => Tokens.BREAK(!lineNum,(yypos - hd(!linePos)))
-			    | "of"          => Tokens.OF(!lineNum,(yypos - hd(!linePos)))
-			    | "end"         => Tokens.END(!lineNum,(yypos - hd(!linePos)))
-          | "in"          => Tokens.IN(!lineNum,(yypos - hd(!linePos)))
-			    | "nil"         => Tokens.NIL(!lineNum,(yypos - hd(!linePos)))
-          | "let"         => Tokens.LET(!lineNum,(yypos - hd(!linePos)))
-			    | "do"          => Tokens.DO(!lineNum,(yypos - hd(!linePos)))
-			    | "to"          => Tokens.TO(!lineNum,(yypos - hd(!linePos)))
-			    | "for"         => Tokens.FOR(!lineNum,(yypos - hd(!linePos)))
-			    | "while"       => Tokens.WHILE(!lineNum,(yypos - hd(!linePos)))
-			    | "else"        => Tokens.ELSE(!lineNum,(yypos - hd(!linePos)))
-			    | "then"        => Tokens.THEN(!lineNum,(yypos - hd(!linePos)))
-			    | "if"          => Tokens.IF(!lineNum,(yypos - hd(!linePos)))
-			    | "array"       => Tokens.ARRAY(!lineNum,(yypos - hd(!linePos)))
+        "function"     => Tokens.FUNCTION(yypos, yypos)
+          | "break"       => Tokens.BREAK(yypos, yypos)
+			    | "of"          => Tokens.OF(yypos, yypos)
+			    | "end"         => Tokens.END(yypos, yypos)
+          | "in"          => Tokens.IN(yypos, yypos)
+			    | "nil"         => Tokens.NIL(yypos, yypos)
+          | "let"         => Tokens.LET(yypos, yypos)
+			    | "do"          => Tokens.DO(yypos, yypos)
+			    | "to"          => Tokens.TO(yypos, yypos)
+			    | "for"         => Tokens.FOR(yypos, yypos)
+			    | "while"       => Tokens.WHILE(yypos, yypos)
+			    | "else"        => Tokens.ELSE(yypos, yypos)
+			    | "then"        => Tokens.THEN(yypos, yypos)
+			    | "if"          => Tokens.IF(yypos, yypos)
+			    | "array"       => Tokens.ARRAY(yypos, yypos)
                               );
 
-<INITIAL>var  	         => (Tokens.VAR(!lineNum,(yypos - hd(!linePos))));
-<INITIAL>type            =>  (Tokens.TYPE(!lineNum,(yypos - hd(!linePos))));
+<INITIAL>var  	         => (Tokens.VAR(yypos, yypos));
+<INITIAL>type            =>  (Tokens.TYPE(yypos, yypos));
 <INITIAL>{sym}           =>  (case yytext of
-				"," => Tokens.COMMA(!lineNum,(yypos - hd(!linePos)))
-				| ":" => Tokens.COLON(!lineNum,(yypos - hd(!linePos)))
-                                | ";" => Tokens.SEMICOLON(!lineNum,(yypos - hd(!linePos)))
-				| "(" => Tokens.LPAREN(!lineNum,(yypos - hd(!linePos)))
-				| ")" => Tokens.RPAREN(!lineNum,(yypos - hd(!linePos)))
-				| "[" => Tokens.LBRACK(!lineNum,(yypos - hd(!linePos)))
-				| "]" => Tokens.RBRACK(!lineNum,(yypos - hd(!linePos)))
-				| "{" => Tokens.LBRACE(!lineNum,(yypos - hd(!linePos)))
-				| "}" => Tokens.RBRACE(!lineNum,(yypos - hd(!linePos)))
-				| "." => Tokens.DOT(!lineNum,(yypos - hd(!linePos)))
-				| "+" => Tokens.PLUS(!lineNum,(yypos - hd(!linePos)))
-				| "-" => Tokens.MINUS(!lineNum,(yypos - hd(!linePos)))
-				| "*" => Tokens.TIMES(!lineNum,(yypos - hd(!linePos)))
-				| "/" => Tokens.DIVIDE(!lineNum,(yypos - hd(!linePos)))
-				| "=" => Tokens.EQ(!lineNum,(yypos - hd(!linePos)))
-				| "<>" => Tokens.NEQ(!lineNum,(yypos - hd(!linePos)))
-				| "<" => Tokens.LT(!lineNum,(yypos - hd(!linePos)))
-				| ">" => Tokens.GT(!lineNum,(yypos - hd(!linePos)))
-				| "<=" => Tokens.LE(!lineNum,(yypos - hd(!linePos)))
-				| ">=" => Tokens.GE(!lineNum,(yypos - hd(!linePos))) 
-				| "&" => Tokens.AND(!lineNum,(yypos - hd(!linePos)))
-				| "|" => Tokens.OR(!lineNum,(yypos - hd(!linePos)))
-				| ":=" => Tokens.ASSIGN(!lineNum,(yypos - hd(!linePos))));
+				"," => Tokens.COMMA(yypos, yypos)
+				| ":" => Tokens.COLON(yypos, yypos)
+                                | ";" => Tokens.SEMICOLON(yypos, yypos)
+				| "(" => Tokens.LPAREN(yypos, yypos)
+				| ")" => Tokens.RPAREN(yypos, yypos)
+				| "[" => Tokens.LBRACK(yypos, yypos)
+				| "]" => Tokens.RBRACK(yypos, yypos)
+				| "{" => Tokens.LBRACE(yypos, yypos)
+				| "}" => Tokens.RBRACE(yypos, yypos)
+				| "." => Tokens.DOT(yypos, yypos)
+				| "+" => Tokens.PLUS(yypos, yypos)
+				| "-" => Tokens.MINUS(yypos, yypos)
+				| "*" => Tokens.TIMES(yypos, yypos)
+				| "/" => Tokens.DIVIDE(yypos, yypos)
+				| "=" => Tokens.EQ(yypos, yypos)
+				| "<>" => Tokens.NEQ(yypos, yypos)
+				| "<" => Tokens.LT(yypos, yypos)
+				| ">" => Tokens.GT(yypos, yypos)
+				| "<=" => Tokens.LE(yypos, yypos)
+				| ">=" => Tokens.GE(yypos, yypos) 
+				| "&" => Tokens.AND(yypos, yypos)
+				| "|" => Tokens.OR(yypos, yypos)
+				| ":=" => Tokens.ASSIGN(yypos, yypos));
 
-<INITIAL>{letter}({digits}|{letter}|_)*   => (Tokens.ID(yytext, !lineNum,(yypos - hd(!linePos))));
+<INITIAL>{letter}({digits}|{letter}|_)*   => (Tokens.ID(yytext, yypos, yypos));
 <INITIAL>{ws}       => (continue());
 <INITIAL>\n	        => (lineNum := !lineNum+1; linePos := yypos :: !linePos; continue());
 <INITIAL>{digits}   => (case Int.fromString(yytext) of
-                          SOME i => (Tokens.INT(i, !lineNum,(yypos - hd(!linePos)))));
+                          SOME i => (Tokens.INT(i, yypos, yypos)));
 <INITIAL>"/*"       => (YYBEGIN COMMENT; legal_eof := false; comlevel := !comlevel+1; continue());
 <INITIAL>\"         => (YYBEGIN STRING; legal_eof := false; continue());
 
@@ -111,7 +111,7 @@ keywords = "function" | "break" | "of" | "end" | "in" | "nil" | "let" | "do" | "
 <COMMENT>\n	        => (lineNum := !lineNum+1; linePos := yypos :: !linePos; continue());
 <COMMENT>.          => (continue());
 
-<STRING>\"	        => (strtmp := !strtok; strtok := ""; YYBEGIN INITIAL; legal_eof := true; Tokens.STRING(!strtmp, !lineNum,(yypos - hd(!linePos))));
+<STRING>\"	        => (strtmp := !strtok; strtok := ""; YYBEGIN INITIAL; legal_eof := true; Tokens.STRING(!strtmp, yypos, yypos));
 <STRING>\n          => (lineNum := !lineNum+1; linePos := yypos :: !linePos; ErrorMsg.error yypos ("line break needed in string"); continue());
 <STRING>\\ 	        => (YYBEGIN ESC; continue());
 <STRING>.	          => (strtok := !strtok ^ yytext; continue());
