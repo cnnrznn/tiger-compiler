@@ -18,7 +18,7 @@ structure A = Absyn
         | lValue of A.var
         | seqExp
         | seqExpList
-        | callExp 
+        | callExp of A.exp
         | infixExp of A.exp
         | arrCreate
         | recCreate
@@ -28,8 +28,8 @@ structure A = Absyn
         | whileExp
         | forExp
         | letExp
-        | paramList
-        | paramListOpt
+        | paramList of A.exp list
+        | paramListOpt of A.exp list
         | fieldCreateOpt
         | fieldCreateList
         | expList
@@ -90,7 +90,7 @@ exp:
         | STRING        (A.StringExp (STRING, STRINGleft))
         | seqExp        ()
         | MINUS exp    %prec UMINUS     ()
-        | callExp       ()
+        | callExp       (callExp)
         | infixExp      (infixExp)
         | arrCreate     ()
         | recCreate     ()
@@ -107,10 +107,10 @@ exp:
 (* sequences.                                           *)
 
 paramListOpt:
-        paramList exp           ()
+        paramList exp           (paramList::exp)
         |                       ()
 paramList:
-        paramList exp COMMA     ()
+        paramList exp COMMA     (paramList::exp)
         |                       ()
 
 fieldCreateOpt:
@@ -199,7 +199,7 @@ vardec:
         (* MINUS exp       () *) 
 
 callExp:
-        ID LPAREN paramListOpt RPAREN    ()
+        ID LPAREN paramListOpt RPAREN    (A.CallExp({ func = Symbol.symbol(ID), args = paramListOpt, pos = IDright }))
 
 (********************************************************)
 (* These are binary operators.                          *)
