@@ -17,7 +17,6 @@ structure A = Absyn
         | program of A.exp
         | lValue of A.var
         | seqExp of A.exp list
-        | seqExpList A.exp list
         | callExp of A.exp
         | infixExp of A.exp
         | arrCreate of A.exp
@@ -97,10 +96,10 @@ exp:
         | assignment    (assignment)
         | ifThenElse    (ifThenElse)
         | ifThen        (ifThen)
-        | whileExp      ()
-        | forExp        ()
+        | whileExp      (whileExp)
+        | forExp        (forExp)
         | BREAK         ()
-        | letExp        ()
+        | letExp        (letExp)
 
 (********************************************************)
 (* Some useful functions for working with different     *)
@@ -121,11 +120,11 @@ fieldCreateList:
         |                               (nil)
 
 expListOpt:
-        expList exp     ()
-        |               ()
+        expList exp     (expList::(exp,expleft))
+        |               (nil)
 expList:
-        expList exp SEMICOLON           ()
-        |                               ()
+        expList exp SEMICOLON           (expList::(exp,expleft))
+        |                               (nil)
 
 decList:
         decList dec             ()
@@ -138,10 +137,7 @@ decList:
 
 seqExp:
         LPAREN RPAREN                   (A.SeqExp([]))
-        | LPAREN seqExpList exp RPAREN  (A.SeqExp(seqExpList::(exp,expleft)))
-seqExpList:
-        seqExpList exp SEMICOLON        (seqExpList::(exp,expleft))
-        |                               (nil)
+        | LPAREN expListOpt RPAREN  (A.SeqExp(expListOpt))
 
 
 (********************************************************)
@@ -245,12 +241,12 @@ ifThen:
 
 whileExp:
         WHILE exp DO exp
-                ()
+                (A.WhileExp({exp1,exp2,WHILEleft}))
 
 forExp:
         FOR ID ASSIGN exp TO exp DO exp
-                ()
+                (A.ForExp({Symbol.symbol(ID), ref true, exp1, exp2, exp3, FORleft }))
 
 letExp:
         LET decList IN expListOpt END
-                ()
+                (A.LetExp({decList,expListOpt, LETleft}))
