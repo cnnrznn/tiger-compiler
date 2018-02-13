@@ -20,21 +20,21 @@ structure A = Absyn
         | seqExpList A.exp list
         | callExp of A.exp
         | infixExp of A.exp
-        | arrCreate
-        | recCreate
-        | assignment
-        | ifThenElse
-        | ifThen
-        | whileExp
-        | forExp
-        | letExp
+        | arrCreate of A.exp
+        | recCreate of A.exp
+        | assignment of A.exp
+        | ifThenElse of A.exp
+        | ifThen of A.exp
+        | whileExp of A.exp
+        | forExp of A.exp
+        | letExp of A.exp
         | paramList of A.exp list
         | paramListOpt of A.exp list
         | fieldCreateOpt
         | fieldCreateList
-        | expList
-        | expListOpt
-        | decList
+        | expList of A.exp list
+        | expListOpt of A.explist
+        | decList of A.dec list
         | subscript of A.var
         | fieldExp of A.var
         | typedec of A.dec
@@ -88,7 +88,7 @@ exp:
         | NIL           (A.NilExp)
         | INT           (A.IntExp INT)
         | STRING        (A.StringExp (STRING, STRINGleft))
-        | seqExp        ()
+        | seqExp        (seqExp)
         | MINUS exp    %prec UMINUS     ()
         | callExp       (callExp)
         | infixExp      (infixExp)
@@ -108,10 +108,10 @@ exp:
 
 paramListOpt:
         paramList exp           (paramList::exp)
-        |                       ()
+        |                       (nil)
 paramList:
         paramList exp COMMA     (paramList::exp)
-        |                       ()
+        |                       (nil)
 
 fieldCreateOpt:
         fieldCreateList ID EQ exp       ()
@@ -137,11 +137,11 @@ decList:
 (* by semi-colons.                                      *)
 
 seqExp:
-        LPAREN RPAREN                   ()
-        | LPAREN seqExpList exp RPAREN  ()
+        LPAREN RPAREN                   (A.SeqExp([]))
+        | LPAREN seqExpList exp RPAREN  (A.SeqExp(seqExpList::(exp,expleft)))
 seqExpList:
-        seqExpList exp SEMICOLON        ()
-        |                               ()
+        seqExpList exp SEMICOLON        (seqExpList::(exp,expleft))
+        |                               (nil)
 
 
 (********************************************************)
@@ -215,8 +215,8 @@ infixExp:
         | exp LE exp            (A.OpExp({exp1, A.LeOp, exp2, LEleft}))
         | exp GT exp            (A.OpExp({exp1, A.GtOp, exp2, GTleft}))
         | exp GE exp            (A.OpExp({exp1, A.GeOp, exp2, GEleft}))
-        | exp AND exp           ()
-        | exp OR exp            ()
+        | exp AND exp           (A.IfExp(exp1, exp2, 0, pos = ANDleft ))
+        | exp OR exp            (A.IfExp(exp1, 1, exp2, pos = ORleft ))
 
 
 recCreate:
