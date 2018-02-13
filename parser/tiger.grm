@@ -94,9 +94,9 @@ exp:
         | infixExp      (infixExp)
         | arrCreate     (arrCreate)
         | recCreate     (recCreate)
-        | assignment    ()
-        | ifThenElse    ()
-        | ifThen        ()
+        | assignment    (assignment)
+        | ifThenElse    (ifThenElse)
+        | ifThen        (ifThen)
         | whileExp      ()
         | forExp        ()
         | BREAK         ()
@@ -114,7 +114,7 @@ paramList:
         |                       (nil)
 
 fieldCreateOpt:
-        fieldCreateList ID EQ exp       (A.RecordExp {(fieldCreateList :: (Symbol.symbol(ID), exp, IDleft)), Symbol.symbol(ID), IDleft})
+        fieldCreateList ID EQ exp       (fieldCreateList :: (Symbol.symbol(ID), exp, IDleft))
         |                               (nil)
 fieldCreateList:
         fieldCreateList ID EQ exp COMMA (fieldCreateList::(Symbol.symbol(ID), exp, IDleft))
@@ -221,7 +221,7 @@ infixExp:
 
 recCreate:
         ID LBRACE fieldCreateOpt RBRACE
-                ()
+                (A.RecordExp { fieldCreateOpt, Symbol.symbol(ID), IDleft})
 
 arrCreate:
         ID LBRACK exp RBRACK OF exp
@@ -229,7 +229,7 @@ arrCreate:
 
 assignment:
         lValue ASSIGN exp
-                ()
+                (A.AssignExp({lValue, exp, ASSIGNleft}))
 
 
 (********************************************************)
@@ -237,11 +237,11 @@ assignment:
 
 ifThenElse:
         IF exp THEN exp ELSE exp
-                ()
+                (A.IfExp({exp1,exp2,exp3, IFleft}))
 
 ifThen:
         IF exp THEN exp
-                ()
+                (A.IfExp({exp1,exp2,NONE, IFleft}))
 
 whileExp:
         WHILE exp DO exp
