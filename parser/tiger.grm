@@ -16,8 +16,8 @@ structure A = Absyn
 %nonterm  exp of A.exp
         | program of A.exp
         | lValue of A.var
-        | seqExp
-        | seqExpList
+        | seqExp of A.exp list
+        | seqExpList A.exp list
         | callExp of A.exp
         | infixExp of A.exp
         | arrCreate
@@ -199,49 +199,58 @@ vardec:
         (* MINUS exp       () *) 
 
 callExp:
-        ID LPAREN paramListOpt RPAREN    (A.CallExp({ func = Symbol.symbol(ID), args = paramListOpt, pos = IDright }))
+        ID LPAREN paramListOpt RPAREN
+                (A.CallExp({Symbol.symbol(ID), paramListOpt, IDright}))
 
 (********************************************************)
 (* These are binary operators.                          *)
 infixExp:
-        exp PLUS exp    (A.OpExp({left = exp1, oper = A.PlusOp, right = exp2, pos = PLUSleft}))
-        | exp MINUS exp    (A.OpExp({left = exp1, oper = A.MinusOp, right = exp2, pos = MINUSleft}))
-        | exp TIMES exp    (A.OpExp({left = exp1, oper = A.TimesOp, right = exp2, pos = TIMESleft}))
-        | exp DIVIDE exp    (A.OpExp({left = exp1, oper = A.DivideOp, right = exp2, pos = DIVIDEleft}))
-        | exp EQ exp    (A.OpExp({left = exp1, oper = A.EqOp, right = exp2, pos = EQleft}))
-        | exp NEQ exp    (A.OpExp({left = exp1, oper = A.NeqOp, right = exp2, pos = NEQleft}))
-        | exp LT exp    (A.OpExp({left = exp1, oper = A.LtOp, right = exp2, pos = LTleft}))
-        | exp LE exp    (A.OpExp({left = exp1, oper = A.LeOp, right = exp2, pos = LEleft}))
-        | exp GT exp    (A.OpExp({left = exp1, oper = A.GtOp, right = exp2, pos = GTleft}))
-        | exp GE exp    (A.OpExp({left = exp1, oper = A.GeOp, right = exp2, pos = GEleft}))
-        | exp AND exp    ()
-        | exp OR exp    ()
+        exp PLUS exp            (A.OpExp({exp1, A.PlusOp, exp2, PLUSleft}))
+        | exp MINUS exp         (A.OpExp({exp1, A.MinusOp, exp2, MINUSleft}))
+        | exp TIMES exp         (A.OpExp({exp1, A.TimesOp, exp2, TIMESleft}))
+        | exp DIVIDE exp        (A.OpExp({exp1, A.DivideOp, exp2, DIVIDEleft}))
+        | exp EQ exp            (A.OpExp({exp1, A.EqOp, exp2, EQleft}))
+        | exp NEQ exp           (A.OpExp({exp1, A.NeqOp, exp2, NEQleft}))
+        | exp LT exp            (A.OpExp({exp1, A.LtOp, exp2, LTleft}))
+        | exp LE exp            (A.OpExp({exp1, A.LeOp, exp2, LEleft}))
+        | exp GT exp            (A.OpExp({exp1, A.GtOp, exp2, GTleft}))
+        | exp GE exp            (A.OpExp({exp1, A.GeOp, exp2, GEleft}))
+        | exp AND exp           ()
+        | exp OR exp            ()
 
 
 recCreate:
-        ID LBRACE fieldCreateOpt RBRACE    ()
+        ID LBRACE fieldCreateOpt RBRACE
+                ()
 
 arrCreate:
-        ID LBRACK exp RBRACK OF exp     ()
+        ID LBRACK exp RBRACK OF exp
+                ()
 
 assignment:
-        lValue ASSIGN exp   ()
+        lValue ASSIGN exp
+                ()
 
 
 (********************************************************)
 (* Branching instructions                               *)
 
 ifThenElse:
-        IF exp THEN exp ELSE exp        ()
+        IF exp THEN exp ELSE exp
+                ()
 
 ifThen:
-        IF exp THEN exp                 ()
+        IF exp THEN exp
+                ()
 
 whileExp:
-        WHILE exp DO exp                ()
+        WHILE exp DO exp
+                ()
 
 forExp:
-        FOR ID ASSIGN exp TO exp DO exp ()
+        FOR ID ASSIGN exp TO exp DO exp
+                ()
 
 letExp:
-        LET decList IN expListOpt END              ()
+        LET decList IN expListOpt END
+                ()
