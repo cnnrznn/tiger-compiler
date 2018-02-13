@@ -1,3 +1,5 @@
+structure A = Absyn
+
 %%
 %term
     EOF 
@@ -11,13 +13,13 @@
   | BREAK | NIL
   | FUNCTION | VAR | TYPE
 
-%nonterm  exp
-        | program
-        | lValue
+%nonterm  exp of A.exp
+        | program of A.exp
+        | lValue of A.var
         | seqExp
         | seqExpList
-        | callExp
-        | infixExp
+        | callExp 
+        | infixExp of A.exp
         | arrCreate
         | recCreate
         | assignment
@@ -33,16 +35,16 @@
         | expList
         | expListOpt
         | decList
-        | subscript
-        | fieldExp
-        | typedec
-        | type
+        | subscript of A.var
+        | fieldExp of A.var
+        | typedec of A.dec
+        | typ
         | typef
         | typeflist
         | fundec
-        | vardec
-        | dec
-        | inter
+        | vardec of A.dec 
+        | dec of  A.dec
+        | inter of A.var
 
 %pos int
 %verbose
@@ -78,18 +80,18 @@
  *  to replace the two dummy productions below with an actual grammar. 
  *)
 
-program	: exp           ()
+program	: exp           (exp)
 
 (* can exp produce empty? *)
 exp:
-        lValue          ()
-        | NIL           ()
-        | INT           ()
-        | STRING        ()
+        lValue          (lValue)
+        | NIL           (A.NilExp)
+        | INT           (A.IntExp INT)
+        | STRING        (A.StringExp (STRING, STRINGleft))
         | seqExp        ()
         | MINUS exp    %prec UMINUS     ()
         | callExp       ()
-        | infixExp      ()
+        | infixExp      (infixExp)
         | arrCreate     ()
         | recCreate     ()
         | assignment    ()
@@ -147,16 +149,16 @@ seqExpList:
 (* from a plain ID, the index of an array, or a field   *)
 (* specifier, as in a struct.                           *)
 
-lValue: ID              ()
-        | inter         ()
-inter : subscript     ()
-        | fieldExp    ()
+lValue: ID              (A.SimpleVar (Symbol.symbol ID, IDleft))
+        | inter         (inter)
+inter : subscript     (subscript)
+        | fieldExp    (fieldExp)
         
 subscript:
-        ID LBRACK exp RBRACK        ()
-        | inter LBRACK exp RBRACK   ()
+        ID LBRACK exp RBRACK        (A.SubscriptVar (A.SimpleVar(Symbol.symbol(ID), IDleft), exp, LBRACKleft)) (* doubt about positions*)
+        | inter LBRACK exp RBRACK   (A.SubscriptVar (inter, exp, LBRACKleft)) (* doubt about positions*)
 fieldExp:
-        lValue DOT ID   ()
+        lValue DOT ID   (A.FieldVar(lValue, Symbol.symbol(ID), DOTleft)) (* doubt about positions*)
 
 (********************************************************)
 (* A declaration can be for a type, a variable, or a    *)
@@ -164,13 +166,13 @@ fieldExp:
 (* time.                                                *)
 
 dec:
-        typedec         ()
-        |vardec          ()
-        |fundec          ()
+        typedec         (typedec)
+        |vardec          (vardec )
+        |fundec          (fundec)
 
-typedec: TYPE ID EQ type        ()
+typedec: TYPE ID EQ typ        (A.TypeDec ({name = Symbol.symbol(ID), ty = typ, pos = TYPEleft})) (* doubt about positions*)
 
-type:    ID                     ()
+typ:    ID                     ()
         | LBRACE typef RBRACE   ()
         | ARRAY OF ID           ()
 
@@ -202,16 +204,16 @@ callExp:
 (********************************************************)
 (* These are binary operators.                          *)
 infixExp:
-        exp PLUS exp    ()
-        | exp MINUS exp    ()
-        | exp TIMES exp    ()
-        | exp DIVIDE exp    ()
-        | exp EQ exp    ()
-        | exp NEQ exp    ()
-        | exp LT exp    ()
-        | exp LE exp    ()
-        | exp GT exp    ()
-        | exp GE exp    ()
+        exp PLUS exp    (A.OpExp({left = exp1, oper = A.PlusOp, right = exp2, pos = PLUSleft}))
+        | exp MINUS exp    (A.OpExp({left = exp1, oper = A.MinusOp, right = exp2, pos = MINUSleft}))
+        | exp TIMES exp    (A.OpExp({left = exp1, oper = A.TimesOp, right = exp2, pos = TIMESleft}))
+        | exp DIVIDE exp    (A.OpExp({left = exp1, oper = A.DivideOp, right = exp2, pos = DIVIDEleft}))
+        | exp EQ exp    (A.OpExp({left = exp1, oper = A.EqOp, right = exp2, pos = EQleft}))
+        | exp NEQ exp    (A.OpExp({left = exp1, oper = A.NeqOp, right = exp2, pos = NEQleft}))
+        | exp LT exp    (A.OpExp({left = exp1, oper = A.LtOp, right = exp2, pos = LTleft}))
+        | exp LE exp    (A.OpExp({left = exp1, oper = A.LeOp, right = exp2, pos = LEleft}))
+        | exp GT exp    (A.OpExp({left = exp1, oper = A.GtOp, right = exp2, pos = GTleft}))
+        | exp GE exp    (A.OpExp({left = exp1, oper = A.GeOp, right = exp2, pos = GEleft}))
         | exp AND exp    ()
         | exp OR exp    ()
 
