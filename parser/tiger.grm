@@ -30,8 +30,8 @@ structure A = Absyn
         | letExp of A.exp
         | paramList of A.exp list
         | paramListOpt of A.exp list
-        | fieldCreateOpt
-        | fieldCreateList
+        | fieldCreateOpt of A.exp
+        | fieldCreateList of A.exp
         | expList of A.exp list
         | expListOpt of A.explist
         | decList of A.dec list
@@ -89,11 +89,11 @@ exp:
         | INT           (A.IntExp INT)
         | STRING        (A.StringExp (STRING, STRINGleft))
         | seqExp        (seqExp)
-        | MINUS exp    %prec UMINUS     ()
+        | MINUS exp    %prec UMINUS     (A.OpExp(0, A.MinusOp, exp, pos = MINUSleft))
         | callExp       (callExp)
         | infixExp      (infixExp)
-        | arrCreate     ()
-        | recCreate     ()
+        | arrCreate     (arrCreate)
+        | recCreate     (recCreate)
         | assignment    ()
         | ifThenElse    ()
         | ifThen        ()
@@ -114,11 +114,11 @@ paramList:
         |                       (nil)
 
 fieldCreateOpt:
-        fieldCreateList ID EQ exp       ()
-        |                               ()
+        fieldCreateList ID EQ exp       (A.RecordExp {(fieldCreateList :: (Symbol.symbol(ID), exp, IDleft)), Symbol.symbol(ID), IDleft})
+        |                               (nil)
 fieldCreateList:
-        fieldCreateList ID EQ exp COMMA ()
-        |                               ()
+        fieldCreateList ID EQ exp COMMA (fieldCreateList::(Symbol.symbol(ID), exp, IDleft))
+        |                               (nil)
 
 expListOpt:
         expList exp     ()
@@ -225,7 +225,7 @@ recCreate:
 
 arrCreate:
         ID LBRACK exp RBRACK OF exp
-                ()
+                (A.ArrayExp(Symbol.symbol(ID), exp1, exp2, IDright))
 
 assignment:
         lValue ASSIGN exp
