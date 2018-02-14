@@ -83,7 +83,7 @@ program	: exp           (exp)
 
 (* can exp produce empty? *)
 exp:
-        lValue          (lValue)
+        lValue          (A.VarExp lValue)
         | NIL           (A.NilExp)
         | INT           (A.IntExp INT)
         | STRING        (A.StringExp (STRING, STRINGleft))
@@ -127,8 +127,21 @@ expList:
         |                               (nil)
 
 decList:
-        dec decList                     (dec :: decList)
-        |                               (nil)
+        dec decList     (case dec of
+                             A.VarDec vd
+                                => (dec :: decList)
+                             | A.TypeDec td
+                                => (case decList of
+                                        A.TypeDec tdl :: rest => (A.TypeDec(td @ tdl) :: rest)
+                                        | _     => (dec :: decList)
+                                   )
+                             | A.FunctionDec fd
+                                => (case decList of
+                                        A.FunctionDec fdl :: rest => (A.FunctionDec(fd @ fdl) :: rest)
+                                        | _     => (dec :: decList)
+                                   )
+                        )
+        |               (nil)
 
 (*************************************************************)
 (* A sequential expression is a sequence of 0 or more   *)
