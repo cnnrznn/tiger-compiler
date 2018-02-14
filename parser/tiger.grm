@@ -106,28 +106,28 @@ exp:
 (* sequences.                                           *)
 
 paramListOpt:
-        paramList exp                   (paramList::exp)
+        exp paramList                   (exp :: paramList)
         |                               (nil)
 paramList:
-        paramList exp COMMA             (paramList::exp)
+        COMMA exp paramList             (exp :: paramList)
         |                               (nil)
 
 fieldCreateOpt:
-        fieldCreateList ID EQ exp       (fieldCreateList :: (Symbol.symbol(ID), exp, IDleft))
+        ID EQ exp fieldCreateList       ((Symbol.symbol(ID), exp, IDleft) :: fieldCreateList)
         |                               (nil)
 fieldCreateList:
-        fieldCreateList ID EQ exp COMMA (fieldCreateList::(Symbol.symbol(ID), exp, IDleft))
+        COMMA ID EQ exp fieldCreateList ((Symbol.symbol(ID), exp, IDleft) :: fieldCreateList)
         |                               (nil)
 
 expListOpt:
-        expList exp                     (expList::(exp,expleft))
+        exp expList                     ((exp,expleft) :: expList)
         |                               (nil)
 expList:
-        expList exp SEMICOLON           (expList::(exp,expleft))
+        SEMICOLON exp expList           ((exp,expleft) :: expList)
         |                               (nil)
 
 decList:
-        decList dec                     (decList::dec)
+        dec decList                     (dec :: decList)
         |                               (nil)
 
 (*************************************************************)
