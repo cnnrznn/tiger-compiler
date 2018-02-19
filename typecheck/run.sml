@@ -1,3 +1,3 @@
 CM.make "sources.cm";
 
-PrintAbsyn.print(TextIO.stdOut, Parse.parse "test1.tig");
+Semant.transProg(Parse.parse "test1.tig");

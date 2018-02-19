@@ -11,6 +11,9 @@ Group is
 ../parser/tiger.grm
 ../parser/prabsyn.sml
 
+types.sml
+semant.sml
+
 $/ml-yacc-lib.cm
 $/smlnj-lib.cm
 $/basis.cm
