@@ -60,7 +60,8 @@ structure A = Absyn
 %nonassoc THEN
 %nonassoc OF DO ELSE 
 %nonassoc ASSIGN
-%left AND OR
+%left OR
+%left AND
 %nonassoc EQ NEQ GE GT LE LT
 %left PLUS MINUS
 %left TIMES DIVIDE
@@ -201,7 +202,7 @@ typef:
                                         pos = ID1left} :: typeflist)
         |   (nil)
 typeflist:
-         ID COLON ID COMMA typeflist
+         COMMA ID COLON ID typeflist
             ( {name = Symbol.symbol(ID1),
                                         escape = ref true,
                                         typ = Symbol.symbol(ID2),
