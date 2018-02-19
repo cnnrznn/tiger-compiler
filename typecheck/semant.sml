@@ -10,21 +10,21 @@ datatype envent = VarEnt of Types.ty
 
 (*******************************************************)
 
-fun checkInts Types.INT Types.INT _ =
+fun checkInts(Types.INT, Types.INT, _) =
         ()
-  | checkInts _ _ pos =
+  | checkInts(_, _, pos) =
         (ErrorMsg.error pos "integer operands required";
         ())
 
-fun checkIntsOrStrings Types.INT Types.INT _ =
+fun checkIntsOrStrings(Types.INT, Types.INT, _) =
         ()
-  | checkIntsOrStrings Types.STRING Types.STRING _ =
+  | checkIntsOrStrings(Types.STRING, Types.STRING, _) =
         ()
-  | checkIntsOrStrings _ _ pos =
+  | checkIntsOrStrings(_, _, pos) =
         (ErrorMsg.error pos "integer or string operands required";
         ())
 
-fun checkSame tl tr pos =
+fun checkSame(tl, tr, pos) =
         if tl = tr then
                 ()
         else
@@ -38,37 +38,36 @@ fun transOp(tenv, venv, Absyn.OpExp{left=lexp, oper=mop, right=rexp, pos=p}) =
                 val {exp=_, ty=tyLeft} = transExp(tenv, venv, lexp)
                 val {exp=_, ty=tyRight} = transExp(tenv, venv, rexp)
         in
-        (*case mop of
-              (Absyn.ExOp | Absyn.NeqOp) => (
-                checkSame(tyLeft, tyRight)
+        case mop of
+              (Absyn.EqOp | Absyn.NeqOp) => (
+                checkSame(tyLeft, tyRight, p)
                 )
             | (Absyn.LtOp | Absyn.LeOp | Absyn.GtOp | Absyn.GeOp) => (
-                checkIntsOrStrings(tyLeft, tyRight)
+                checkIntsOrStrings(tyLeft, tyRight, p)
                 )
 
             | (Absyn.PlusOp | Absyn.MinusOp | Absyn.TimesOp | Absyn.DivideOp) => (
                 checkInts(tyLeft, tyRight, p)
-                )*)
-                ()
+                )
         end
 
 (*******************************************************)
 
-fun transVar tenv venv var =
+and transVar(tenv, venv, var) =
         let
         in {}
         end
 
 (*******************************************************)
 
-fun transDec tenv venv dec =
+and transDec(tenv, venv, dec) =
         let
         in {}
         end
 
 (*******************************************************)
 
-fun transExp tenv venv exp =
+and transExp(tenv, venv, exp)=
 case exp of
   Absyn.OpExp opexp =>
         (transOp(tenv, venv, Absyn.OpExp opexp);
@@ -85,7 +84,7 @@ case exp of
 
 (*******************************************************)
 
-fun transProg exp =
+and transProg(exp) =
         let
                 val tenv : Types.ty Symbol.table = Symbol.empty
                 val venv : envent Symbol.table = Symbol.empty
