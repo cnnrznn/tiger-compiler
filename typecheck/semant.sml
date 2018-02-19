@@ -6,12 +6,12 @@ datatype envent = VarEnt of Types.ty
 
 fun transProg exp =
         let
-                val tenv : envent Symbol.table = Symbol.empty
+                val tenv : Types.ty Symbol.table = Symbol.empty
                 val venv : envent Symbol.table = Symbol.empty
 
                 (* add base environment *)
-                val tenv = Symbol.enter(tenv, Symbol.symbol "string", VarEnt Types.STRING);
-                val tenv = Symbol.enter(tenv, Symbol.symbol "int", VarEnt Types.INT);
+                val tenv = Symbol.enter(tenv, Symbol.symbol "string", Types.STRING);
+                val tenv = Symbol.enter(tenv, Symbol.symbol "int", Types.INT);
 
                 val venv = Symbol.enter(venv, Symbol.symbol "print",    FunEnt {params=[Types.STRING], res=Types.UNIT});
                 val venv = Symbol.enter(venv, Symbol.symbol "flush",    FunEnt {params=[], res=Types.UNIT});
@@ -24,6 +24,7 @@ fun transProg exp =
                 val venv = Symbol.enter(venv, Symbol.symbol "not",      FunEnt {params=[Types.INT], res=Types.INT});
                 val venv = Symbol.enter(venv, Symbol.symbol "exit",     FunEnt {params=[Types.INT], res=Types.UNIT});
         in
+                PrintAbsyn.print(TextIO.stdOut, Parse.parse "test1.tig");
                 (* recurse *)
                 ()
         end
