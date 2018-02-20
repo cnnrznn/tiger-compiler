@@ -10,12 +10,9 @@ type expty = {exp: Translate.exp, ty: Types.ty}
 datatype envent = VarEnt of Types.ty
                 | FunEnt of { params: Types.ty list, res: Types.ty }
 
-(*******************************************************)
-
-fun compareFieldLists([], []) = true (* same length, or empty *)
-  | compareFieldLists((s1,t1)::f1, (s2,t2)::f2) =
-        (t1 = t2)
-  | compareFieldLists(_, _) = false (* different lengths *)
+(********************************************************)
+(* These functions are used to check the left and       *)
+(* right sides of arithmetic operations.                *)
 
 fun checkInts(Types.INT, Types.INT, _) =
         ()
@@ -35,14 +32,14 @@ fun checkIntsStrsRecsArrs(Types.INT, Types.INT, _) =
         ()
   | checkIntsStrsRecsArrs(Types.STRING, Types.STRING, _) =
         ()
-  | checkIntsStrsRecsArrs(Types.RECORD(fl1, _), Types.RECORD(fl2, _), pos) =
-        (if compareFieldLists(fl1, fl2) then ()
+  | checkIntsStrsRecsArrs(Types.RECORD(_, u1), Types.RECORD(_, u2), pos) =
+        (if u1 = u2 then ()
          else
                 (ErrorMsg.error pos "record types don't match";
                 ())
         )
-  | checkIntsStrsRecsArrs(Types.ARRAY(t1, _), Types.ARRAY(t2, _), pos) =
-        (if t1 = t2 then ()
+  | checkIntsStrsRecsArrs(Types.ARRAY(_, u1), Types.ARRAY(_, u2), pos) =
+        (if u1 = u2 then ()
          else
                 (ErrorMsg.error pos "array types don't match";
                 ())
@@ -53,7 +50,7 @@ fun checkIntsStrsRecsArrs(Types.INT, Types.INT, _) =
 
 (*******************************************************)
 
-fun transOp(tenv, venv, A.OpExp{left=lexp, oper=mop, right=rexp, pos=p}) =
+fun transOpExp(tenv, venv, A.OpExp{left=lexp, oper=mop, right=rexp, pos=p}) =
         let
                 val {exp=_, ty=tyLeft} = transExp(tenv, venv, lexp)
                 val {exp=_, ty=tyRight} = transExp(tenv, venv, rexp)
@@ -73,9 +70,79 @@ fun transOp(tenv, venv, A.OpExp{left=lexp, oper=mop, right=rexp, pos=p}) =
 
 (*******************************************************)
 
-and transVar(tenv, venv, var) =
+and transCallExp(tenv, venv, var) =
         let
-        in {}
+        in Types.INT
+        end
+
+(*******************************************************)
+
+and transRecordExp(tenv, venv, var) =
+        let
+        in Types.INT
+        end
+
+(*******************************************************)
+
+and transSeqExp(tenv, venv, var) =
+        let
+        in Types.INT
+        end
+
+(*******************************************************)
+
+and transAssignExp(tenv, venv, var) =
+        let
+        in Types.INT
+        end
+
+(*******************************************************)
+
+and transIfExp(tenv, venv, var) =
+        let
+        in Types.INT
+        end
+
+(*******************************************************)
+
+and transWhileExp(tenv, venv, var) =
+        let
+        in Types.INT
+        end
+
+(*******************************************************)
+
+and transForExp(tenv, venv, var) =
+        let
+        in Types.INT
+        end
+
+(*******************************************************)
+
+and transBreakExp(tenv, venv, var) =
+        let
+        in Types.INT
+        end
+
+(*******************************************************)
+
+and transLetExp(tenv, venv, var) =
+        let
+        in Types.INT
+        end
+
+(*******************************************************)
+
+and transArrayExp(tenv, venv, var) =
+        let
+        in Types.INT
+        end
+
+(*******************************************************)
+
+and transVarExp(tenv, venv, var) =
+        let
+        in Types.INT
         end
 
 (*******************************************************)
@@ -95,16 +162,36 @@ and transTy tenv ty =
 and transExp(tenv, venv, exp) =
 case exp of
   A.OpExp opexp =>
-        (transOp(tenv, venv, A.OpExp opexp);
+        (transOpExp(tenv, venv, A.OpExp opexp);
         {exp=(), ty=Types.INT})
 | A.VarExp var =>
-        {exp=(), ty=Types.INT}
+        {exp=(), ty=transVarExp(tenv, venv, var)}
 | A.NilExp =>
+        {exp=(), ty=Types.NIL}
+| A.IntExp n =>
         {exp=(), ty=Types.INT}
 | A.StringExp(str, p) =>
-        {exp=(), ty=Types.INT}
+        {exp=(), ty=Types.STRING}
 | A.CallExp callexp =>
-        {exp=(), ty=Types.INT}
+        {exp=(), ty=transCallExp(tenv, venv, A.CallExp callexp)}
+| A.RecordExp recexp =>
+        {exp=(), ty=transRecordExp(tenv, venv, recexp)}
+| A.SeqExp seqexp =>
+        {exp=(), ty=transSeqExp(tenv, venv, seqexp)}
+| A.AssignExp assignexp =>
+        {exp=(), ty=transAssignExp(tenv, venv, assignexp)}
+| A.IfExp ifexp =>
+        {exp=(), ty=transIfExp(tenv, venv, ifexp)}
+| A.WhileExp whilexp =>
+        {exp=(), ty=transWhileExp(tenv, venv, whilexp)}
+| A.ForExp forexp =>
+        {exp=(), ty=transForExp(tenv, venv, forexp)}
+| A.BreakExp breakexp =>
+        {exp=(), ty=transBreakExp(tenv, venv, breakexp)}
+| A.LetExp letexp =>
+        {exp=(), ty=transLetExp(tenv, venv, letexp)}
+| A.ArrayExp arrexp =>
+        {exp=(), ty=transArrayExp(tenv, venv, arrexp)}
 (* TODO fill in rest of expression types *)
 
 (*******************************************************)
