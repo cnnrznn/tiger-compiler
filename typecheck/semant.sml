@@ -45,7 +45,7 @@ fun checkIntsStrsRecsArrs(Types.INT, Types.INT, _) =
                 ())
         )
   | checkIntsStrsRecsArrs(_, _, pos) =
-        (ErrorMsg.error pos "integer, string, array or record operands required";
+        (ErrorMsg.error pos "integer, string, array, or record operands required";
         ())
 
 (*******************************************************)
@@ -147,9 +147,9 @@ and transVarExp(tenv, venv, var) =
 
 (*******************************************************)
 
-and transDec(tenv, venv, dec) =
+and transDecs(tenv, venv, decs) =
         let
-        in {}
+        in {te=tenv, ve=venv}
         end
 
 and transTy tenv ty =
@@ -188,8 +188,11 @@ case exp of
         {exp=(), ty=transForExp(tenv, venv, forexp)}
 | A.BreakExp breakexp =>
         {exp=(), ty=transBreakExp(tenv, venv, breakexp)}
-| A.LetExp letexp =>
-        {exp=(), ty=transLetExp(tenv, venv, letexp)}
+| A.LetExp {decs, body, pos} =>
+        let val {te=tenv', ve=venv'} =
+                        transDecs(tenv, venv, decs)
+        in transExp(tenv', venv', body)
+        end
 | A.ArrayExp arrexp =>
         {exp=(), ty=transArrayExp(tenv, venv, arrexp)}
 (* TODO fill in rest of expression types *)
