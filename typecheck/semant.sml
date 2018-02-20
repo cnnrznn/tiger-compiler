@@ -1,3 +1,5 @@
+structure A = Absyn
+
 structure Translate = struct type exp = unit end
 
 structure Semant =
@@ -33,20 +35,20 @@ fun checkSame(tl, tr, pos) =
 
 (*******************************************************)
 
-fun transOp(tenv, venv, Absyn.OpExp{left=lexp, oper=mop, right=rexp, pos=p}) =
+fun transOp(tenv, venv, A.OpExp{left=lexp, oper=mop, right=rexp, pos=p}) =
         let
                 val {exp=_, ty=tyLeft} = transExp(tenv, venv, lexp)
                 val {exp=_, ty=tyRight} = transExp(tenv, venv, rexp)
         in
         case mop of
-              (Absyn.EqOp | Absyn.NeqOp) => (
+              (A.EqOp | A.NeqOp) => (
                 checkSame(tyLeft, tyRight, p)
                 )
-            | (Absyn.LtOp | Absyn.LeOp | Absyn.GtOp | Absyn.GeOp) => (
+            | (A.LtOp | A.LeOp | A.GtOp | A.GeOp) => (
                 checkIntsOrStrings(tyLeft, tyRight, p)
                 )
 
-            | (Absyn.PlusOp | Absyn.MinusOp | Absyn.TimesOp | Absyn.DivideOp) => (
+            | (A.PlusOp | A.MinusOp | A.TimesOp | A.DivideOp) => (
                 checkInts(tyLeft, tyRight, p)
                 )
         end
@@ -65,20 +67,25 @@ and transDec(tenv, venv, dec) =
         in {}
         end
 
+and transTy tenv ty =
+        let
+        in {}
+        end
+
 (*******************************************************)
 
-and transExp(tenv, venv, exp)=
+and transExp(tenv, venv, exp) =
 case exp of
-  Absyn.OpExp opexp =>
-        (transOp(tenv, venv, Absyn.OpExp opexp);
+  A.OpExp opexp =>
+        (transOp(tenv, venv, A.OpExp opexp);
         {exp=(), ty=Types.INT})
-| Absyn.VarExp var =>
+| A.VarExp var =>
         {exp=(), ty=Types.INT}
-| Absyn.NilExp =>
+| A.NilExp =>
         {exp=(), ty=Types.INT}
-| Absyn.StringExp(str, p) =>
+| A.StringExp(str, p) =>
         {exp=(), ty=Types.INT}
-| Absyn.CallExp callexp =>
+| A.CallExp callexp =>
         {exp=(), ty=Types.INT}
 (* TODO fill in rest of expression types *)
 
