@@ -1,4 +1,5 @@
 structure A = Absyn
+structure S = Symbol
 
 structure Translate = struct type exp = unit end
 
@@ -9,6 +10,15 @@ type expty = {exp: Translate.exp, ty: Types.ty}
 
 datatype envent = VarEnt of Types.ty
                 | FunEnt of { params: Types.ty list, res: Types.ty }
+
+
+(********************************************************)
+(* Function for translating a NAME into a different     *)
+(* type                                                 *)
+fun actual_ty ty =
+        case ty
+         of Types.NAME ty' => actual_ty(Types.NAME ty')
+          | ty' => ty'
 
 (********************************************************)
 (* These functions are used to check the left and       *)
@@ -50,21 +60,23 @@ fun checkIntsStrsRecsArrs(Types.INT, Types.INT, _) =
 
 (*******************************************************)
 
-fun transOpExp(tenv, venv, A.OpExp{left=lexp, oper=mop, right=rexp, pos=p}) =
+fun transOpExp(tenv, venv, A.OpExp{left, oper, right, pos}) =
         let
-                val {exp=_, ty=tyLeft} = transExp(tenv, venv, lexp)
-                val {exp=_, ty=tyRight} = transExp(tenv, venv, rexp)
+                val {exp=_, ty=tyLeft} = transExp(tenv, venv, left)
+                val {exp=_, ty=tyRight} = transExp(tenv, venv, right)
+                val atl = actual_ty tyLeft
+                val atr = actual_ty tyRight
         in
-        case mop of
+        case oper of
               (A.EqOp | A.NeqOp) => (
-                checkIntsStrsRecsArrs(tyLeft, tyRight, p)
+                checkIntsStrsRecsArrs(atl, atr, pos)
                 )
             | (A.LtOp | A.LeOp | A.GtOp | A.GeOp) => (
-                checkIntsOrStrings(tyLeft, tyRight, p)
+                checkIntsOrStrings(atl, atr, pos)
                 )
 
             | (A.PlusOp | A.MinusOp | A.TimesOp | A.DivideOp) => (
-                checkInts(tyLeft, tyRight, p)
+                checkInts(atl, atr, pos)
                 )
         end
 
@@ -140,10 +152,17 @@ and transArrayExp(tenv, venv, var) =
 
 (*******************************************************)
 
-and transVarExp(tenv, venv, var) =
-        let
-        in Types.INT
-        end
+and transVarExp(tenv, venv, A.SimpleVar(id,pos)) =
+        (case Symbol.look(venv, id)
+         of SOME (VarEnt ty) => actual_ty ty
+          | NONE => (ErrorMsg.error pos ("undefined variable " ^
+                                                S.name id);
+                        Types.INT)
+        )
+  | transVarExp(tenv, venv, A.FieldVar(var, id, pos)) =
+        Types.INT (* TODO *)
+  | transVarExp(tenv, venv, A.SubscriptVar(var, exp, pos)) =
+        Types.INT (* TODO *)
 
 (*******************************************************)
 
@@ -195,7 +214,6 @@ case exp of
         end
 | A.ArrayExp arrexp =>
         {exp=(), ty=transArrayExp(tenv, venv, arrexp)}
-(* TODO fill in rest of expression types *)
 
 (*******************************************************)
 
