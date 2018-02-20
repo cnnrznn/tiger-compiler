@@ -12,6 +12,11 @@ datatype envent = VarEnt of Types.ty
 
 (*******************************************************)
 
+fun compareFieldLists([], []) = true (* same length, or empty *)
+  | compareFieldLists((s1,t1)::f1, (s2,t2)::f2) =
+        (t1 = t2)
+  | compareFieldLists(_, _) = false (* different lengths *)
+
 fun checkInts(Types.INT, Types.INT, _) =
         ()
   | checkInts(_, _, pos) =
@@ -26,12 +31,25 @@ fun checkIntsOrStrings(Types.INT, Types.INT, _) =
         (ErrorMsg.error pos "integer or string operands required";
         ())
 
-fun checkSame(tl, tr, pos) =
-        if tl = tr then
-                ()
-        else
-                (ErrorMsg.error pos "type mismatch";
+fun checkIntsStrsRecsArrs(Types.INT, Types.INT, _) =
+        ()
+  | checkIntsStrsRecsArrs(Types.STRING, Types.STRING, _) =
+        ()
+  | checkIntsStrsRecsArrs(Types.RECORD(fl1, _), Types.RECORD(fl2, _), pos) =
+        (if compareFieldLists(fl1, fl2) then ()
+         else
+                (ErrorMsg.error pos "record types don't match";
                 ())
+        )
+  | checkIntsStrsRecsArrs(Types.ARRAY(t1, _), Types.ARRAY(t2, _), pos) =
+        (if t1 = t2 then ()
+         else
+                (ErrorMsg.error pos "array types don't match";
+                ())
+        )
+  | checkIntsStrsRecsArrs(_, _, pos) =
+        (ErrorMsg.error pos "integer, string, array or record operands required";
+        ())
 
 (*******************************************************)
 
@@ -42,7 +60,7 @@ fun transOp(tenv, venv, A.OpExp{left=lexp, oper=mop, right=rexp, pos=p}) =
         in
         case mop of
               (A.EqOp | A.NeqOp) => (
-                checkSame(tyLeft, tyRight, p)
+                checkIntsStrsRecsArrs(tyLeft, tyRight, p)
                 )
             | (A.LtOp | A.LeOp | A.GtOp | A.GeOp) => (
                 checkIntsOrStrings(tyLeft, tyRight, p)
