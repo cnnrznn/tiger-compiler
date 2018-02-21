@@ -1,15 +1,16 @@
 structure A = Absyn
 structure S = Symbol
+structure T = Types
 
 structure Translate = struct type exp = unit end
 
 structure Semant =
 struct
 
-type expty = {exp: Translate.exp, ty: Types.ty}
+type expty = {exp: Translate.exp, ty: T.ty}
 
-datatype envent = VarEnt of Types.ty
-                | FunEnt of { params: Types.ty list, res: Types.ty }
+datatype envent = VarEnt of T.ty
+                | FunEnt of { params: T.ty list, res: T.ty }
 
 
 (********************************************************)
@@ -17,53 +18,62 @@ datatype envent = VarEnt of Types.ty
 (* type                                                 *)
 fun actual_ty ty =
         case ty
-         of Types.NAME ty' => actual_ty(Types.NAME ty')
+         of T.NAME ty' => actual_ty(T.NAME ty')
           | ty' => ty'
 
 (********************************************************)
 (* Walk through a Record's field list, looking for      *)
 (* symbol 'id2'. If it's in the list, return it's type. *)
-(* If not, return Types.INT.                            *)
+(* If not, return T.INT.                            *)
 
-fun findFieldType(Types.RECORD((id1, ty)::rest, u), id2, pos) =
+fun findFieldType(T.RECORD((id1, ty)::rest, u), id2, pos) =
         if id1 = id2 then actual_ty ty
-        else findFieldType(Types.RECORD(rest, u), id2, pos)
-  | findFieldType(Types.RECORD([], u), id2, pos) =
+        else findFieldType(T.RECORD(rest, u), id2, pos)
+  | findFieldType(T.RECORD([], u), id2, pos) =
         (ErrorMsg.error pos ("Unable to find symbol " ^
                                 S.name id2 ^
                                 " in record");
-         Types.INT
+         T.INT
         )
+
+(********************************************************)
+
+fun checkDecType(T.RECORD(_, u1), T.RECORD(_, u2)) = u1 = u2
+  | checkDecType(T.RECORD(_, _), T.NIL) = true
+  | checkDecType(T.INT, T.INT) = true
+  | checkDecType(T.STRING, T.STRING) = true
+  | checkDecType(T.ARRAY(_, u1), T.ARRAY(_, u2)) = u1 = u2
+  | checkDecType(_, _) = false
 
 (********************************************************)
 (* These functions are used to check the left and       *)
 (* right sides of arithmetic operations.                *)
 
-fun checkInts(Types.INT, Types.INT, _) =
+fun checkInts(T.INT, T.INT, _) =
         ()
   | checkInts(_, _, pos) =
         (ErrorMsg.error pos "integer operands required";
         ())
 
-fun checkIntsOrStrings(Types.INT, Types.INT, _) =
+fun checkIntsOrStrings(T.INT, T.INT, _) =
         ()
-  | checkIntsOrStrings(Types.STRING, Types.STRING, _) =
+  | checkIntsOrStrings(T.STRING, T.STRING, _) =
         ()
   | checkIntsOrStrings(_, _, pos) =
         (ErrorMsg.error pos "integer or string operands required";
         ())
 
-fun checkIntsStrsRecsArrs(Types.INT, Types.INT, _) =
+fun checkIntsStrsRecsArrs(T.INT, T.INT, _) =
         ()
-  | checkIntsStrsRecsArrs(Types.STRING, Types.STRING, _) =
+  | checkIntsStrsRecsArrs(T.STRING, T.STRING, _) =
         ()
-  | checkIntsStrsRecsArrs(Types.RECORD(_, u1), Types.RECORD(_, u2), pos) =
+  | checkIntsStrsRecsArrs(T.RECORD(_, u1), T.RECORD(_, u2), pos) =
         (if u1 = u2 then ()
          else
                 (ErrorMsg.error pos "record types don't match";
                 ())
         )
-  | checkIntsStrsRecsArrs(Types.ARRAY(_, u1), Types.ARRAY(_, u2), pos) =
+  | checkIntsStrsRecsArrs(T.ARRAY(_, u1), T.ARRAY(_, u2), pos) =
         (if u1 = u2 then ()
          else
                 (ErrorMsg.error pos "array types don't match";
@@ -99,63 +109,63 @@ fun transOpExp(tenv, venv, A.OpExp{left, oper, right, pos}) =
 
 and transCallExp(tenv, venv, var) =
         let
-        in Types.INT
+        in T.INT
         end
 
 (*******************************************************)
 
 and transRecordExp(tenv, venv, var) =
         let
-        in Types.INT
+        in T.INT
         end
 
 (*******************************************************)
 
 and transSeqExp(tenv, venv, var) =
         let
-        in Types.INT
+        in T.INT
         end
 
 (*******************************************************)
 
 and transAssignExp(tenv, venv, var) =
         let
-        in Types.INT
+        in T.INT
         end
 
 (*******************************************************)
 
 and transIfExp(tenv, venv, var) =
         let
-        in Types.INT
+        in T.INT
         end
 
 (*******************************************************)
 
 and transWhileExp(tenv, venv, var) =
         let
-        in Types.INT
+        in T.INT
         end
 
 (*******************************************************)
 
 and transForExp(tenv, venv, var) =
         let
-        in Types.INT
+        in T.INT
         end
 
 (*******************************************************)
 
 and transBreakExp(tenv, venv, var) =
         let
-        in Types.INT
+        in T.INT
         end
 
 (*******************************************************)
 
 and transArrayExp(tenv, venv, var) =
         let
-        in Types.INT
+        in T.INT
         end
 
 (*******************************************************)
@@ -165,27 +175,27 @@ and transVarExp(tenv, venv, A.SimpleVar(id,pos)) =
          of SOME (VarEnt ty) => actual_ty ty
           | NONE => (ErrorMsg.error pos ("undefined variable " ^
                                                 S.name id);
-                        Types.INT)
+                        T.INT)
         )
   | transVarExp(tenv, venv, A.FieldVar(var, id, pos)) =
         (case transVarExp(tenv, venv, var)
-         of Types.RECORD record => (findFieldType(Types.RECORD record, id, pos))
+         of T.RECORD record => (findFieldType(T.RECORD record, id, pos))
           | _ => (ErrorMsg.error pos "Accessing a field in non-record type";
-                        Types.INT)
+                        T.INT)
         )
   | transVarExp(tenv, venv, A.SubscriptVar(var, exp, pos)) =
         (case transVarExp(tenv, venv, var)
-         of Types.ARRAY(arrty, unique) => (
+         of T.ARRAY(arrty, unique) => (
                 let val {exp, ty=tyexp} = transExp(tenv, venv, exp)
                 in
                   case tyexp
-                    of Types.INT => (actual_ty arrty)
+                    of T.INT => (actual_ty arrty)
                      | _ => (ErrorMsg.error pos "Array index must be of type INT";
-                                  Types.INT)
+                                  T.INT)
                 end
                 )
           | _ => (ErrorMsg.error pos "Accessing subscript of non-array type";
-                        Types.INT)
+                        T.INT)
         )
 
 (*******************************************************)
@@ -197,7 +207,7 @@ and transVarDec(tenv, venv, A.VarDec{name, escape, typ, init, pos}) =
          of SOME(id, p) => (
                 case Symbol.look(tenv, id)
                  of SOME typ =>
-                        if (typ) = (tyexp) then
+                        if checkDecType(actual_ty typ, actual_ty tyexp) then
                                 {te=tenv, ve=S.enter(venv, name, VarEnt tyexp)}
                         else (  ErrorMsg.error p "type mismatch";
                                 {te=tenv, ve=venv}
@@ -237,15 +247,15 @@ and transExp(tenv, venv, exp) =
 case exp of
   A.OpExp opexp =>
         (transOpExp(tenv, venv, A.OpExp opexp);
-        {exp=(), ty=Types.INT})
+        {exp=(), ty=T.INT})
 | A.VarExp var =>
         {exp=(), ty=transVarExp(tenv, venv, var)}
 | A.NilExp =>
-        {exp=(), ty=Types.NIL}
+        {exp=(), ty=T.NIL}
 | A.IntExp n =>
-        {exp=(), ty=Types.INT}
+        {exp=(), ty=T.INT}
 | A.StringExp(str, p) =>
-        {exp=(), ty=Types.STRING}
+        {exp=(), ty=T.STRING}
 | A.CallExp callexp =>
         {exp=(), ty=transCallExp(tenv, venv, A.CallExp callexp)}
 | A.RecordExp recexp =>
@@ -274,23 +284,23 @@ case exp of
 
 and transProg(exp) =
         let
-                val tenv : Types.ty Symbol.table = Symbol.empty
+                val tenv : T.ty Symbol.table = Symbol.empty
                 val venv : envent Symbol.table = Symbol.empty
 
                 (* add base environment *)
-                val tenv = Symbol.enter(tenv, Symbol.symbol "string", Types.STRING);
-                val tenv = Symbol.enter(tenv, Symbol.symbol "int", Types.INT);
+                val tenv = Symbol.enter(tenv, Symbol.symbol "string", T.STRING);
+                val tenv = Symbol.enter(tenv, Symbol.symbol "int", T.INT);
 
-                val venv = Symbol.enter(venv, Symbol.symbol "print",    FunEnt {params=[Types.STRING], res=Types.UNIT});
-                val venv = Symbol.enter(venv, Symbol.symbol "flush",    FunEnt {params=[], res=Types.UNIT});
-                val venv = Symbol.enter(venv, Symbol.symbol "getchar",  FunEnt {params=[], res=Types.STRING});
-                val venv = Symbol.enter(venv, Symbol.symbol "ord",      FunEnt {params=[Types.STRING], res=Types.INT});
-                val venv = Symbol.enter(venv, Symbol.symbol "chr",      FunEnt {params=[Types.INT], res=Types.STRING});
-                val venv = Symbol.enter(venv, Symbol.symbol "size",     FunEnt {params=[Types.STRING], res=Types.INT});
-                val venv = Symbol.enter(venv, Symbol.symbol "substring",FunEnt {params=[Types.STRING, Types.INT, Types.INT], res=Types.STRING});
-                val venv = Symbol.enter(venv, Symbol.symbol "concat",   FunEnt {params=[Types.STRING, Types.STRING], res=Types.STRING});
-                val venv = Symbol.enter(venv, Symbol.symbol "not",      FunEnt {params=[Types.INT], res=Types.INT});
-                val venv = Symbol.enter(venv, Symbol.symbol "exit",     FunEnt {params=[Types.INT], res=Types.UNIT});
+                val venv = Symbol.enter(venv, Symbol.symbol "print",    FunEnt {params=[T.STRING], res=T.UNIT});
+                val venv = Symbol.enter(venv, Symbol.symbol "flush",    FunEnt {params=[], res=T.UNIT});
+                val venv = Symbol.enter(venv, Symbol.symbol "getchar",  FunEnt {params=[], res=T.STRING});
+                val venv = Symbol.enter(venv, Symbol.symbol "ord",      FunEnt {params=[T.STRING], res=T.INT});
+                val venv = Symbol.enter(venv, Symbol.symbol "chr",      FunEnt {params=[T.INT], res=T.STRING});
+                val venv = Symbol.enter(venv, Symbol.symbol "size",     FunEnt {params=[T.STRING], res=T.INT});
+                val venv = Symbol.enter(venv, Symbol.symbol "substring",FunEnt {params=[T.STRING, T.INT, T.INT], res=T.STRING});
+                val venv = Symbol.enter(venv, Symbol.symbol "concat",   FunEnt {params=[T.STRING, T.STRING], res=T.STRING});
+                val venv = Symbol.enter(venv, Symbol.symbol "not",      FunEnt {params=[T.INT], res=T.INT});
+                val venv = Symbol.enter(venv, Symbol.symbol "exit",     FunEnt {params=[T.INT], res=T.UNIT});
         in
                 PrintAbsyn.print(TextIO.stdOut, Parse.parse "test1.tig");
                 (* recurse *)
