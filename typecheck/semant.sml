@@ -224,20 +224,41 @@ and transFunDec(tenv, venv, []) =
   | transFunDec(tenv, venv, {name, params, result, body, pos}::fundecs) =
         {te=tenv, ve=venv} (* TODO *)
 
-and transTypDec(tenv, venv, []) =
+and transTypHed(tenv, venv, []) =
         {te=tenv, ve=venv}
-  | transTypDec(tenv, venv, {name, ty, pos}::typedecs) =
-        {te=tenv, ve=venv} (* TODO *)
+  | transTypHed(tenv, venv, {name, ty, pos}::typedecs) =
+        let val tenv' = S.enter(tenv, name, Types.NAME(name, ref NONE))
+        in {te=tenv', ve=venv}
+        end
+
+and transTypBod(tenv, venv, []) =
+        {te=tenv, ve=venv}
+  | transTypBod(tenv, venv, {name, ty, pos}::typedecs) =
+        case S.look(tenv, name)
+         of NONE => (   ErrorMsg.error pos "should never see this";
+                        {te=tenv, ve=venv}
+                        )
+          | SOME tableEnt => (
+                case ty
+                 of A.NameTy(sym pos) =>
+                  | A.RecordTy(fields) => (
+                        )
+                  | A.ArrayTy(sym, pos) => (
+                        )
+                )
+        end
 
 and transDecs(tenv, venv, A.FunctionDec dec::decs) =
-        let val {te=tenv', ve=venv'} = transFunDec(tenv, venv, dec)
-        in transDecs(tenv', venv', decs) end
+        let val {te=tenv', ve=venv'} = transFunHed(tenv, venv, dec)
+            val {te=tenv'', ve=venv''} = transFunBod(tenv', venv', dec)
+        in transDecs(tenv'', venv'', decs) end
   | transDecs(tenv, venv, A.VarDec dec::decs) =
         let val {te=tenv', ve=venv'} = transVarDec(tenv, venv, A.VarDec dec)
         in transDecs(tenv', venv', decs) end
   | transDecs(tenv, venv, A.TypeDec dec::decs) =
-        let val {te=tenv', ve=venv'} = transTypDec(tenv, venv, dec)
-        in transDecs(tenv', venv', decs) end
+        let val {te=tenv', ve=venv'} = transTypHed(tenv, venv, dec)
+            val {te=tenv'', ve=venv''} = transTypBod(tenv', venv', dec)
+        in transDecs(tenv'', venv'', decs) end
   | transDecs(tenv, venv, []) =
         {te=tenv, ve=venv}
 
