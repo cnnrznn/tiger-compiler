@@ -64,19 +64,19 @@ fun transOpExp(tenv, venv, A.OpExp{left, oper, right, pos}) =
         let
                 val {exp=_, ty=tyLeft} = transExp(tenv, venv, left)
                 val {exp=_, ty=tyRight} = transExp(tenv, venv, right)
-                val atl = actual_ty tyLeft
-                val atr = actual_ty tyRight
+                (* val atl = actual_ty tyLeft
+                val atr = actual_ty tyRight *)
         in
         case oper of
               (A.EqOp | A.NeqOp) => (
-                checkIntsStrsRecsArrs(atl, atr, pos)
+                checkIntsStrsRecsArrs(tyLeft, tyRight, pos)
                 )
             | (A.LtOp | A.LeOp | A.GtOp | A.GeOp) => (
-                checkIntsOrStrings(atl, atr, pos)
+                checkIntsOrStrings(tyLeft, tyRight, pos)
                 )
 
             | (A.PlusOp | A.MinusOp | A.TimesOp | A.DivideOp) => (
-                checkInts(atl, atr, pos)
+                checkInts(tyLeft, tyRight, pos)
                 )
         end
 
@@ -166,15 +166,49 @@ and transVarExp(tenv, venv, A.SimpleVar(id,pos)) =
 
 (*******************************************************)
 
-and transDecs(tenv, venv, decs) =
-        let
-        in {te=tenv, ve=venv}
-        end
-
 and transTy tenv ty =
         let
         in {}
         end
+
+and transVarDec(tenv, venv, A.VarDec{name, escape, typ, init, pos}) =
+        let val {exp=(), ty=tyexp} = transExp(tenv, venv, init)
+        in
+        case typ
+         of SOME(id, p) => (
+                case Symbol.look(tenv, id)
+                 of SOME typ =>
+                        if (typ) = (tyexp) then
+                                {te=tenv, ve=S.enter(venv, name, VarEnt tyexp)}
+                        else (  ErrorMsg.error p "type mismatch";
+                                {te=tenv, ve=venv}
+                        )
+                  | NONE => (   ErrorMsg.error p "type not defined";
+                                {te=tenv, ve=venv}
+                        )
+                )
+          | NONE => {te=tenv, ve=S.enter(venv, name, VarEnt tyexp)}
+        end
+
+and transFunDec(tenv, venv, []) =
+        {te=tenv, ve=venv}
+  | transFunDec(tenv, venv, A.fundec{name, params, result, body, pos}::fundecs) =
+
+and transTypDec(tenv, venv, []) =
+        {te=tenv, ve=venv}
+  | transTypDec(tenv, venv, A.TypeDec{name, ty pos}::typedecs) =
+
+and transDecs(tenv, venv, A.FunctionDec dec::decs) =
+        let val {te=tenv', ve=venv'} = transFunDec(tenv, venv, dec)
+        in transDecs(tenv', venv', decs) end
+  | transDecs(tenv, venv, A.VarDec dec::decs) =
+        let val {te=tenv', ve=venv'} = transVarDec(tenv, venv, A.VarDec dec)
+        in transDecs(tenv', venv', decs) end
+  | transDecs(tenv, venv, A.TypeDec dec::decs) =
+        let val {te=tenv', ve=venv'} = transTypDec(tenv, venv, dec)
+        in transDecs(tenv', venv', decs) end
+  | transDecs(tenv, venv, []) =
+        {te=tenv, ve=venv}
 
 (*******************************************************)
 
