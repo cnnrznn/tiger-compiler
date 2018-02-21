@@ -21,6 +21,21 @@ fun actual_ty ty =
           | ty' => ty'
 
 (********************************************************)
+(* Walk through a Record's field list, looking for      *)
+(* symbol 'id2'. If it's in the list, return it's type. *)
+(* If not, return Types.INT.                            *)
+
+fun findFieldType(Types.RECORD((id1, ty)::rest, u), id2, pos) =
+        if id1 = id2 then actual_ty ty
+        else findFieldType(Types.RECORD(rest, u), id2, pos)
+  | findFieldType(Types.RECORD([], u), id2, pos) =
+        (ErrorMsg.error pos ("Unable to find symbol " ^
+                                S.name id2 ^
+                                " in record");
+         Types.INT
+        )
+
+(********************************************************)
 (* These functions are used to check the left and       *)
 (* right sides of arithmetic operations.                *)
 
@@ -138,13 +153,6 @@ and transBreakExp(tenv, venv, var) =
 
 (*******************************************************)
 
-and transLetExp(tenv, venv, var) =
-        let
-        in Types.INT
-        end
-
-(*******************************************************)
-
 and transArrayExp(tenv, venv, var) =
         let
         in Types.INT
@@ -160,16 +168,27 @@ and transVarExp(tenv, venv, A.SimpleVar(id,pos)) =
                         Types.INT)
         )
   | transVarExp(tenv, venv, A.FieldVar(var, id, pos)) =
-        Types.INT (* TODO *)
+        (case transVarExp(tenv, venv, var)
+         of Types.RECORD record => (findFieldType(Types.RECORD record, id, pos))
+          | _ => (ErrorMsg.error pos "Accessing a field in non-record type";
+                        Types.INT)
+        )
   | transVarExp(tenv, venv, A.SubscriptVar(var, exp, pos)) =
-        Types.INT (* TODO *)
+        (case transVarExp(tenv, venv, var)
+         of Types.ARRAY(arrty, unique) => (
+                let val {exp, ty=tyexp} = transExp(tenv, venv, exp)
+                in
+                  case tyexp
+                    of Types.INT => (actual_ty arrty)
+                     | _ => (ErrorMsg.error pos "Array index must be of type INT";
+                                  Types.INT)
+                end
+                )
+          | _ => (ErrorMsg.error pos "Accessing subscript of non-array type";
+                        Types.INT)
+        )
 
 (*******************************************************)
-
-and transTy tenv ty =
-        let
-        in {}
-        end
 
 and transVarDec(tenv, venv, A.VarDec{name, escape, typ, init, pos}) =
         let val {exp=(), ty=tyexp} = transExp(tenv, venv, init)
@@ -192,11 +211,13 @@ and transVarDec(tenv, venv, A.VarDec{name, escape, typ, init, pos}) =
 
 and transFunDec(tenv, venv, []) =
         {te=tenv, ve=venv}
-  | transFunDec(tenv, venv, A.fundec{name, params, result, body, pos}::fundecs) =
+  | transFunDec(tenv, venv, {name, params, result, body, pos}::fundecs) =
+        {te=tenv, ve=venv} (* TODO *)
 
 and transTypDec(tenv, venv, []) =
         {te=tenv, ve=venv}
-  | transTypDec(tenv, venv, A.TypeDec{name, ty pos}::typedecs) =
+  | transTypDec(tenv, venv, {name, ty, pos}::typedecs) =
+        {te=tenv, ve=venv} (* TODO *)
 
 and transDecs(tenv, venv, A.FunctionDec dec::decs) =
         let val {te=tenv', ve=venv'} = transFunDec(tenv, venv, dec)
