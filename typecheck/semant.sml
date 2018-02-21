@@ -107,7 +107,7 @@ fun transOpExp(tenv, venv, A.OpExp{left, oper, right, pos}) =
 
 (*******************************************************)
 
-and transCallExp(tenv, venv, var) =
+and transCallExp(tenv, venv, var ) =
         let
         in T.INT
         end
@@ -128,9 +128,15 @@ and transSeqExp(tenv, venv, var) =
 
 (*******************************************************)
 
-and transAssignExp(tenv, venv, var) =
-        let
-        in T.INT
+and transAssignExp(tenv, venv, A.AssignExp{var,exp, pos}) =
+        let 
+		val tyVar = transVarExp(tenv, venv, var)
+                val {exp=_ , ty=tyExp} = transExp(tenv, venv, exp)
+        in
+		if checkDecType(actual_ty tyVar, actual_ty tyExp) then
+                                T.UNIT
+                else (  ErrorMsg.error pos "type mismatch";
+                                T.UNIT)
         end
 
 (*******************************************************)
@@ -257,13 +263,13 @@ case exp of
 | A.StringExp(str, p) =>
         {exp=(), ty=T.STRING}
 | A.CallExp callexp =>
-        {exp=(), ty=transCallExp(tenv, venv, A.CallExp callexp)}
+        {exp=(), ty=transCallExp(tenv, venv, callexp)}
 | A.RecordExp recexp =>
         {exp=(), ty=transRecordExp(tenv, venv, recexp)}
 | A.SeqExp seqexp =>
         {exp=(), ty=transSeqExp(tenv, venv, seqexp)}
 | A.AssignExp assignexp =>
-        {exp=(), ty=transAssignExp(tenv, venv, assignexp)}
+        {exp=(), ty=transAssignExp(tenv, venv, A.AssignExp assignexp)}
 | A.IfExp ifexp =>
         {exp=(), ty=transIfExp(tenv, venv, ifexp)}
 | A.WhileExp whilexp =>
