@@ -12,6 +12,7 @@ type expty = {exp: Translate.exp, ty: T.ty}
 datatype envent = VarEnt of T.ty
                 | FunEnt of { params: T.ty list, res: T.ty }
 
+val loopLevel = ref 0
 
 (********************************************************)
 (* Function for translating a NAME into a different     *)
@@ -234,15 +235,19 @@ and transIfExp(tenv, venv, A.IfExp{test, then', else', pos}) =
 (* Does produce no value means T.UNIT? *)
 and transWhileExp(tenv, venv, A.WhileExp {test, body, pos}) =
 	let
-		val {exp=_ , ty=tyTest} = transExp(tenv, venv, test)
-		val {exp=_ , ty=tyBody} = transExp(tenv, venv, body)
-	in
+		val {exp=_ , ty=tyTest} = transExp(tenv, venv, test);
+	in loopLevel := !loopLevel + 1;
+		let
+			val {exp=_ , ty=tyBody} = transExp(tenv, venv, body)
+		in
+        loopLevel := !loopLevel - 1;
 		case (actual_ty tyTest, actual_ty tyBody)
 			of (T.INT,T.UNIT) => (T.UNIT)
 			| (T.INT,_)		 =>(ErrorMsg.error pos "Body must produce no value";
 								T.UNIT)
 			| (_, T.UNIT)		 => (ErrorMsg.error pos "Test is not integer value";
-								T.UNIT)
+						T.UNIT)
+		end
 	end
 
 (*******************************************************)
@@ -255,13 +260,16 @@ and transForExp(tenv, venv, A.ForExp {var, escape, lo, hi, body, pos}) =
 	in
 		case (actual_ty tyLo, actual_ty tyHi)
 		of (T.INT, T.INT) =>
-			let val {exp=_ , ty=tyBody} = transExp(tenv, venv', body)	
+			(loopLevel := !loopLevel + 1;
+			let 
+				val {exp=_ , ty=tyBody} = transExp(tenv, venv', body)	
 			in
+				loopLevel := !loopLevel - 1;
 				case tyBody
 				of T.UNIT => T.UNIT
 				| _ => (ErrorMsg.error pos "Body must produce no value";
 								T.UNIT)
-			end
+			end)
 		| (_, _) => (ErrorMsg.error pos "lo/hi expressions must be integer value";
 								T.UNIT)
 	end
