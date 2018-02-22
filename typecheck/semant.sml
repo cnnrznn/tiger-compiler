@@ -191,13 +191,6 @@ and transSeqExp(tenv, venv, A.SeqExp ((exp, pos)::(onemore::rest))) =
         let val {exp=_, ty=tyexp} = transExp(tenv, venv, exp)
         in tyexp
         end
-        (*let
-		val {exp=_ , ty=tyExp} = transExp(tenv, venv, exp)
-	in 
-		case rest 
-		of Nil	=> actual_ty tyExp
-		| _ 	=>transSeqExp(tenv, venv, A.SeqExp rest)
-	end*)
 	
 (*******************************************************)
 
@@ -219,7 +212,7 @@ and transIfExp(tenv, venv, A.IfExp{test, then', else', pos}) =
 			val {exp=_ , ty=tyTest} = transExp(tenv, venv, test)
 			val {exp=_ , ty=tyThen} = transExp(tenv, venv, then')
         in 
-			if actual_ty tyTest = T.INT then
+			if tyTest = T.INT then
 			case else' 
       			of SOME e =>
 					let val {exp=_ , ty=tyElse} = transExp(tenv, venv, e)
@@ -291,22 +284,26 @@ and transBreakExp(tenv, venv,  A.BreakExp pos ) =
 
 (*******************************************************)
 
-and transArrayExp(tenv, venv, A.ArrayExp {typ,size,init,pos}) =
-		(case S.look(tenv,typ)
-		 of SOME (T.ARRAY(arrty,u)) => 
-			(let
-				val {exp=_ , ty=tySize} = transExp(tenv, venv, size)
-				val {exp=_ , ty=tyInit} = transExp(tenv, venv, init)
- in
-				if actual_ty tySize = T.INT then
-					if checkDecType(actual_ty arrty, actual_ty tyInit) then
-						arrty
-					else (  ErrorMsg.error pos "type mismatch";T.INT)
-				else
-					(ErrorMsg.error pos ("Array Size must be an Integer ");T.INT)
-			end)
-			| NONE => (ErrorMsg.error pos ("undefined type " ^ S.name typ);
-                        T.INT))
+and transArrayExp(tenv, venv, A.ArrayExp {typ,size,init,pos}) = (
+        case S.look(tenv,typ) of
+          SOME (ty) => (
+                let
+                        val arrty = actual_ty ty
+                        val T.ARRAY(itemty, _) = arrty
+                        val {exp=_ , ty=tySize} = transExp(tenv, venv, size)
+                        val {exp=_ , ty=tyInit} = transExp(tenv, venv, init)
+                in
+                        if tySize = T.INT then
+                                if checkDecType(itemty, tyInit) then
+                                        arrty
+                                else (  ErrorMsg.error pos ("type mismatch " ^ S.name typ) ;T.INT)
+                        else
+                                (ErrorMsg.error pos ("Array Size must be an Integer ");T.INT)
+                end
+                )
+        | _ => (ErrorMsg.error pos ("undefined type " ^ S.name typ);
+        T.INT)
+        )
 
 (*******************************************************)
 
@@ -389,7 +386,7 @@ and transFunHed(tenv, venv, []) =
             | params2types({name, escape, typ, pos}::rest) =
                 (case S.look(tenv, typ) of
                    SOME t => (t :: params2types(rest))
-                |  NONE => ((* TODO error *)
+                |  NONE => (ErrorMsg.error pos "function parameter of undefined type";
                             (T.INT :: params2types(rest)))
                 )
           fun resTy(typ) = (
@@ -408,14 +405,28 @@ and transFunHed(tenv, venv, []) =
 
 and transFunBod(tenv, venv, A.FunctionDec []) = ()
   | transFunBod(tenv, venv, A.FunctionDec({name, params, result, body, pos}::fundecs)) =
+        let fun params2venv(venv, []) = venv
+              | params2venv(venv, {name, escape, typ, pos}::params) = (
+                        params2venv(S.enter(venv, name, VarEnt(case S.look(tenv, typ) of
+                                                                SOME t => t | NONE => (*TODO throw error*)T.INT)),
+                                params)
+              )
+        in
         ((case S.look(venv, name)
-         of SOME(FunEnt{params, res}) =>
-                        (* TODO create new environment, translate expression 'body' *) ()
+         of SOME(FunEnt{params=pms, res}) =>
+                        (* TODO create new environment, translate expression 'body' *)
+                        (let val venv' = params2venv(venv, params)
+                        in transExp(tenv, venv', body)
+                        end;
+                        ())
           | _ => (ErrorMsg.error pos "should never see this (fun)";
                   ()
                 ));
         transFunBod(tenv, venv, A.FunctionDec(fundecs))
         )
+        end
+  | transFunBod(_, _, _) =
+        (ErrorMsg.error 0 "unexpected error"; ())
 
 and transTypHed(tenv, venv, []) =
         {te=tenv, ve=venv}
@@ -458,7 +469,7 @@ case exp of
         (transOpExp(tenv, venv, A.OpExp opexp);
         {exp=(), ty=T.INT})
 | A.VarExp var =>
-        {exp=(), ty=transVarExp(tenv, venv, var)}
+        {exp=(), ty=actual_ty(transVarExp(tenv, venv, var))}
 | A.NilExp =>
         {exp=(), ty=T.NIL}
 | A.IntExp n =>
@@ -466,28 +477,28 @@ case exp of
 | A.StringExp(str, p) =>
         {exp=(), ty=T.STRING}
 | A.CallExp callexp =>
-        {exp=(), ty=transCallExp(tenv, venv, A.CallExp callexp)}
+        {exp=(), ty=actual_ty(transCallExp(tenv, venv, A.CallExp callexp))}
 | A.RecordExp recexp =>
-        {exp=(), ty=transRecordExp(tenv, venv, A.RecordExp recexp)}
+        {exp=(), ty=actual_ty(transRecordExp(tenv, venv, A.RecordExp recexp))}
 | A.SeqExp seqexp =>
-        {exp=(), ty=transSeqExp(tenv, venv, A.SeqExp seqexp)}
+        {exp=(), ty=actual_ty(transSeqExp(tenv, venv, A.SeqExp seqexp))}
 | A.AssignExp assignexp =>
-        {exp=(), ty=transAssignExp(tenv, venv, A.AssignExp assignexp)}
+        {exp=(), ty=actual_ty(transAssignExp(tenv, venv, A.AssignExp assignexp))}
 | A.IfExp ifexp =>
-        {exp=(), ty=transIfExp(tenv, venv, A.IfExp ifexp)}
+        {exp=(), ty=actual_ty(transIfExp(tenv, venv, A.IfExp ifexp))}
 | A.WhileExp whilexp =>
-        {exp=(), ty=transWhileExp(tenv, venv, A.WhileExp whilexp)}
+        {exp=(), ty=actual_ty(transWhileExp(tenv, venv, A.WhileExp whilexp))}
 | A.ForExp forexp =>
-        {exp=(), ty=transForExp(tenv, venv, A.ForExp forexp)}
+        {exp=(), ty=actual_ty(transForExp(tenv, venv, A.ForExp forexp))}
 | A.BreakExp breakexp =>
-        {exp=(), ty=transBreakExp(tenv, venv,  A.BreakExp breakexp)}
+        {exp=(), ty=actual_ty(transBreakExp(tenv, venv,  A.BreakExp breakexp))}
 | A.LetExp {decs, body, pos} =>
         let val {te=tenv', ve=venv'} =
                         transDecs(tenv, venv, decs)
         in transExp(tenv', venv', body)
         end
 | A.ArrayExp arrexp =>
-        {exp=(), ty=transArrayExp(tenv, venv, A.ArrayExp arrexp)}
+        {exp=(), ty=actual_ty(transArrayExp(tenv, venv, A.ArrayExp arrexp))}
 
 (*******************************************************)
 
@@ -511,9 +522,10 @@ and transProg(exp) =
                 val venv = Symbol.enter(venv, Symbol.symbol "not",      FunEnt {params=[T.INT], res=T.INT});
                 val venv = Symbol.enter(venv, Symbol.symbol "exit",     FunEnt {params=[T.INT], res=T.UNIT});
         in
-                PrintAbsyn.print(TextIO.stdOut, Parse.parse "test1.tig");
-
                 (* recurse *)
-                transExp(tenv, venv, exp)
+                transExp(tenv, venv, exp);
+
+                (* return UNIT *)
+                ()
         end
 end
