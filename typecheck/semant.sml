@@ -99,6 +99,8 @@ fun checkIntsStrsRecsArrs(T.INT, T.INT, _) =
                 (ErrorMsg.error pos "array types don't match";
                 ())
         )
+  | checkIntsStrsRecsArrs(T.NIL, T.RECORD(_, _), _) = ()
+  | checkIntsStrsRecsArrs(T.RECORD(_, _), T.NIL, _) = ()
   | checkIntsStrsRecsArrs(_, _, pos) =
         (ErrorMsg.error pos "integer, string, array, or record operands required";
         ())
@@ -130,7 +132,7 @@ and checkFunctionArgs(tenv, venv,(tyFormal::restFormal), res, (exp::restActual),
 	(let
 		val {exp=_ , ty = tyExp} = transExp(tenv, venv, exp)
 	 in
-		if actual_ty tyFormal = actual_ty tyExp then
+		if checkDecType(actual_ty tyFormal, tyExp) then
 			checkFunctionArgs(tenv, venv,restFormal, res, restActual, pos)
 		else
 			(ErrorMsg.error pos ("Type Mismatch in args");
@@ -146,7 +148,7 @@ and transCallExp(tenv, venv, A.CallExp {func,args, pos} ) =
 			if checkFunctionArgs(tenv, venv,params, res, args, pos) then
 				res
 			else (T.INT)		 
-		| NONE => (ErrorMsg.error pos ("undeclared function " ^ S.name func);
+		| _ => (ErrorMsg.error pos ("undeclared function " ^ S.name func);
                         T.INT)
 	)
 (********************************************************)
@@ -172,13 +174,16 @@ and checkRecordFields(tenv,venv,T.RECORD((id1, tyRec)::rest, u), ((id2,expRec,po
 								 false)
 and transRecordExp(tenv, venv, A.RecordExp{fields,typ, pos}) =
 	(case S.look(tenv,typ)
-		of SOME (T.RECORD record) => (
-			if checkRecordFields(tenv, venv,T.RECORD record, fields, pos) then
-				(T.RECORD record)
-			else
-				(T.INT)
+		of SOME ty => (
+                        let val recty = actual_ty ty
+			in
+                                if checkRecordFields(tenv, venv, recty, fields, pos) then
+                                        recty
+                                else
+                                        (T.INT)
+                        end
 		)
-		|NONE =>  (ErrorMsg.error pos ("undefined type " ^ S.name typ);
+		| _ =>  (ErrorMsg.error pos ("undefined type " ^ S.name typ);
                         T.INT)
 	)
 
@@ -199,7 +204,7 @@ and transAssignExp(tenv, venv, A.AssignExp{var,exp, pos}) =
 		val tyVar = transVarExp(tenv, venv, var)
 		val {exp=_ , ty=tyExp} = transExp(tenv, venv, exp)
 	in
-		if checkDecType(actual_ty tyVar, actual_ty tyExp) then
+		if checkDecType(tyVar, tyExp) then
                                 T.UNIT
 		else (  ErrorMsg.error pos "type mismatch";
                                 T.UNIT)
@@ -209,25 +214,25 @@ and transAssignExp(tenv, venv, A.AssignExp{var,exp, pos}) =
 
 and transIfExp(tenv, venv, A.IfExp{test, then', else', pos}) =
         let
-			val {exp=_ , ty=tyTest} = transExp(tenv, venv, test)
-			val {exp=_ , ty=tyThen} = transExp(tenv, venv, then')
+                val {exp=_ , ty=tyTest} = transExp(tenv, venv, test)
+                val {exp=_ , ty=tyThen} = transExp(tenv, venv, then')
         in 
-			if tyTest = T.INT then
-			case else' 
-      			of SOME e =>
-					let val {exp=_ , ty=tyElse} = transExp(tenv, venv, e)
-					in
-						if checkSame(actual_ty tyThen, actual_ty tyElse) then(
-							case actual_ty tyThen
-							  of T.NIL => actual_ty tyThen
-							  | _ => actual_ty tyElse)
-						else (ErrorMsg.error pos "type mismatch";
-                                	T.UNIT)
-                    end
-        		 | NONE => T.UNIT
-			else
-				(ErrorMsg.error pos "Test is not integer value";
-                                T.UNIT)	
+                if tyTest = T.INT then
+                        case else'
+                        of SOME e =>
+                                let val {exp=_ , ty=tyElse} = transExp(tenv, venv, e)
+                                in
+                                        if checkSame(tyThen, tyElse) then(
+                                                case tyThen
+                                                  of T.NIL => tyElse
+                                                  | _ => tyThen)
+                                        else (ErrorMsg.error pos "type mismatch";
+                                              T.UNIT)
+                                end
+                        | NONE => T.UNIT
+                else
+                        (ErrorMsg.error pos "Test is not integer value";
+                        T.UNIT)
         end
 
 (*******************************************************)
@@ -240,7 +245,7 @@ and transWhileExp(tenv, venv, A.WhileExp {test, body, pos}) =
 			val {exp=_ , ty=tyBody} = transExp(tenv, venv, body)
 		in
         loopLevel := !loopLevel - 1;
-		case (actual_ty tyTest, actual_ty tyBody)
+		case (tyTest, tyBody)
 			of (T.INT,T.UNIT) => (T.UNIT)
 			| (T.INT,_)		 =>(ErrorMsg.error pos "Body must produce no value";
 								T.UNIT)
