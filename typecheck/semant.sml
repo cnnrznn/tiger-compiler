@@ -125,18 +125,33 @@ fun transOpExp(tenv, venv, A.OpExp{left, oper, right, pos}) =
         end
 
 (*******************************************************)
+and checkFunctionArgs(tenv, venv,(tyFormal::restFormal), res, (exp::restActual), pos) =
+	(let
+		val {exp=_ , ty = tyExp} = transExp(tenv, venv, exp)
+	 in
+		if actual_ty tyFormal = actual_ty tyExp then
+			checkFunctionArgs(tenv, venv,restFormal, res, restActual, pos)
+		else
+			(ErrorMsg.error pos ("Type Mismatch in args");
+                        false)	
+	 end
+	)
+ | checkFunctionArgs(tenv, venv,[], res, [], pos) = true	
+ | checkFunctionArgs(tenv, venv,_,res,_, pos) =(ErrorMsg.error pos ("Incomplete arguments in the function call"); false)
 
-and transCallExp(tenv, venv, var ) =
-        let
-        in T.INT
-        end
-
-(*******************************************************)
+and transCallExp(tenv, venv, A.CallExp {func,args, pos} ) =
+	(case S.look(venv,func)
+		of SOME (FunEnt {params, res}) => 
+			if checkFunctionArgs(tenv, venv,params, res, args, pos) then
+				res
+			else (T.INT)		 
+		| NONE => (ErrorMsg.error pos ("undeclared function " ^ S.name func);
+                        T.INT)
+	)
 (********************************************************)
 (* FUnction to check if the record creation is legal by *)
 (* walking through the record fields and matching the   *)
 (* names and and types.                                 *) 
-(* TODO : MOve this function up with other check functions*)
 
 and checkRecordFields(tenv,venv,T.RECORD((id1, tyRec)::rest, u), ((id2,expRec,posF)::restFields), pos) =
 	(let
@@ -154,7 +169,6 @@ and checkRecordFields(tenv,venv,T.RECORD((id1, tyRec)::rest, u), ((id2,expRec,po
   | checkRecordFields(tenv, venv, T.RECORD([], u), [], pos) = true
   | checkRecordFields(tenv,venv, _ , _ , pos) =(ErrorMsg.error pos ("mismatched field names");
 								 false)
-(* TODO: empty record expression*)
 and transRecordExp(tenv, venv, A.RecordExp{fields,typ, pos}) =
 	(case S.look(tenv,typ)
 		of SOME (T.RECORD record) => (
@@ -430,7 +444,7 @@ case exp of
 | A.StringExp(str, p) =>
         {exp=(), ty=T.STRING}
 | A.CallExp callexp =>
-        {exp=(), ty=transCallExp(tenv, venv, callexp)}
+        {exp=(), ty=transCallExp(tenv, venv, A.CallExp callexp)}
 | A.RecordExp recexp =>
         {exp=(), ty=transRecordExp(tenv, venv, A.RecordExp recexp)}
 | A.SeqExp seqexp =>
