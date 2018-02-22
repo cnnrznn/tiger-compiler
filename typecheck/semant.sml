@@ -183,11 +183,15 @@ and transRecordExp(tenv, venv, A.RecordExp{fields,typ, pos}) =
 
 (*******************************************************)
 
-and transSeqExp(tenv, venv, var) =
-        let
-        in T.INT
-        end
-
+and transSeqExp(tenv, venv, A.SeqExp ((exp, pos)::rest)) =
+	let
+		val {exp=_ , ty=tyExp} = transExp(tenv, venv, exp)
+	in 
+		case rest 
+		of Nil	=> actual_ty tyExp
+		| _ 	=>transSeqExp(tenv, venv, A.SeqExp rest)
+	end
+	
 (*******************************************************)
 
 and transAssignExp(tenv, venv, A.AssignExp{var,exp, pos}) =
@@ -462,7 +466,7 @@ case exp of
 | A.RecordExp recexp =>
         {exp=(), ty=transRecordExp(tenv, venv, A.RecordExp recexp)}
 | A.SeqExp seqexp =>
-        {exp=(), ty=transSeqExp(tenv, venv, seqexp)}
+        {exp=(), ty=transSeqExp(tenv, venv,  A.SeqExp seqexp)}
 | A.AssignExp assignexp =>
         {exp=(), ty=transAssignExp(tenv, venv, A.AssignExp assignexp)}
 | A.IfExp ifexp =>
