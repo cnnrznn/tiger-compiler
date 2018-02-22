@@ -276,10 +276,12 @@ and transForExp(tenv, venv, A.ForExp {var, escape, lo, hi, body, pos}) =
 
 (*******************************************************)
 
-and transBreakExp(tenv, venv, var) =
-        let
-        in T.INT
-        end
+and transBreakExp(tenv, venv,  A.BreakExp pos ) =
+	( if !loopLevel = 0 then
+		(ErrorMsg.error pos "Illegal break. No enclosing While/For loop";
+								T.UNIT)
+	  else (T.UNIT)
+	)
 
 (*******************************************************)
 
@@ -484,7 +486,7 @@ case exp of
 | A.ForExp forexp =>
         {exp=(), ty=transForExp(tenv, venv, A.ForExp forexp)}
 | A.BreakExp breakexp =>
-        {exp=(), ty=transBreakExp(tenv, venv, breakexp)}
+        {exp=(), ty=transBreakExp(tenv, venv,  A.BreakExp breakexp)}
 | A.LetExp {decs, body, pos} =>
         let val {te=tenv', ve=venv'} =
                         transDecs(tenv, venv, decs)
