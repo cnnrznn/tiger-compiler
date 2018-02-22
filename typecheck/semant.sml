@@ -45,6 +45,7 @@ fun checkDecType(T.RECORD(_, u1), T.RECORD(_, u2)) = u1 = u2
   | checkDecType(T.ARRAY(_, u1), T.ARRAY(_, u2)) = u1 = u2
   | checkDecType(_, _) = false
 
+
 (********************************************************)
 (* These functions are used to check the left and       *)
 (* right sides of arithmetic operations.                *)
@@ -113,11 +114,40 @@ and transCallExp(tenv, venv, var ) =
         end
 
 (*******************************************************)
+(********************************************************)
+(* FUnction to check if the record creation is legal by *)
+(* walking through the record fields and matching the   *)
+(* names and and types.                                 *) 
+(* TODO : MOve this function up with other check functions*)
 
-and transRecordExp(tenv, venv, var) =
-        let
-        in T.INT
-        end
+and checkRecordFields(tenv,venv,T.RECORD((id1, tyRec)::rest, u), ((id2,expRec,posF)::restFields), pos) =
+	(let
+			val {exp=_ , ty = tyExp} = transExp(tenv, venv, expRec) 
+	in
+			if id1 = id2 then 
+				if checkDecType(actual_ty tyRec, actual_ty tyExp) then
+					checkRecordFields(tenv, venv, T.RECORD(rest, u), restFields, pos)
+				else
+					(ErrorMsg.error posF ("type mismatch in record field " ^ S.name id1);
+					false)
+			else (ErrorMsg.error posF ("field names incorrect" ^ S.name id1);
+                        false)
+	end)
+  | checkRecordFields(tenv, venv, T.RECORD([], u), [], pos) = true
+  | checkRecordFields(tenv,venv, _ , _ , pos) =(ErrorMsg.error pos ("mismatched field names");
+								 false)
+(* TODO: empty record expression*)
+and transRecordExp(tenv, venv, A.RecordExp{fields,typ, pos}) =
+	(case S.look(tenv,typ)
+		of SOME (T.RECORD record) => (
+			if checkRecordFields(tenv, venv,T.RECORD record, fields, pos) then
+				(T.RECORD record)
+			else
+				(T.INT)
+		)
+		|NONE =>  (ErrorMsg.error pos ("undefined type " ^ S.name typ);
+                        T.INT)
+	)
 
 (*******************************************************)
 
@@ -141,9 +171,27 @@ and transAssignExp(tenv, venv, A.AssignExp{var,exp, pos}) =
 
 (*******************************************************)
 
-and transIfExp(tenv, venv, var) =
+and transIfExp(tenv, venv, A.IfExp{test, then', else', pos}) =
         let
-        in T.INT
+			val {exp=_ , ty=tyTest} = transExp(tenv, venv, test)
+			val {exp=_ , ty=tyThen} = transExp(tenv, venv, then')
+        in 
+			if actual_ty tyTest = T.INT then
+			case else' 
+      			of SOME e =>
+					let val {exp=_ , ty=tyElse} = transExp(tenv, venv, e)
+					in
+						if checkDecType(actual_ty tyThen, actual_ty tyElse) then(
+							case actual_ty tyThen
+							  of T.NIL => actual_ty tyThen
+							  | _ => actual_ty tyElse)
+						else (ErrorMsg.error pos "type mismatch";
+                                	T.UNIT)
+                    end
+        		 | NONE => T.UNIT
+			else
+				(ErrorMsg.error pos "Test is not integer value";
+                                T.UNIT)	
         end
 
 (*******************************************************)
@@ -169,10 +217,23 @@ and transBreakExp(tenv, venv, var) =
 
 (*******************************************************)
 
-and transArrayExp(tenv, venv, var) =
-        let
-        in T.INT
-        end
+and transArrayExp(tenv, venv, A.ArrayExp {typ,size,init,pos}) =
+		(case S.look(tenv,typ)
+		 of SOME (T.ARRAY(arrty,u)) => (let
+										val {exp=_ , ty=tySize} = transExp(tenv, venv, size)
+										val {exp=_ , ty=tyInit} = transExp(tenv, venv, init)
+        							in
+										if actual_ty tySize = T.INT then
+											if checkDecType(actual_ty arrty, actual_ty tyInit) then
+                                	 			arrty 	
+                        					else (  ErrorMsg.error pos "type mismatch";
+                                				 T.INT) 		
+										else
+											(ErrorMsg.error pos ("Array Size must be an Integer ");
+                        					T.INT)	
+									end)
+			| NONE => (ErrorMsg.error pos ("undefined type " ^ S.name typ);
+                        T.INT))
 
 (*******************************************************)
 
@@ -265,13 +326,13 @@ case exp of
 | A.CallExp callexp =>
         {exp=(), ty=transCallExp(tenv, venv, callexp)}
 | A.RecordExp recexp =>
-        {exp=(), ty=transRecordExp(tenv, venv, recexp)}
+        {exp=(), ty=transRecordExp(tenv, venv, A.RecordExp recexp)}
 | A.SeqExp seqexp =>
         {exp=(), ty=transSeqExp(tenv, venv, seqexp)}
 | A.AssignExp assignexp =>
         {exp=(), ty=transAssignExp(tenv, venv, A.AssignExp assignexp)}
 | A.IfExp ifexp =>
-        {exp=(), ty=transIfExp(tenv, venv, ifexp)}
+        {exp=(), ty=transIfExp(tenv, venv, A.IfExp ifexp)}
 | A.WhileExp whilexp =>
         {exp=(), ty=transWhileExp(tenv, venv, whilexp)}
 | A.ForExp forexp =>
@@ -284,7 +345,7 @@ case exp of
         in transExp(tenv', venv', body)
         end
 | A.ArrayExp arrexp =>
-        {exp=(), ty=transArrayExp(tenv, venv, arrexp)}
+        {exp=(), ty=transArrayExp(tenv, venv, A.ArrayExp arrexp)}
 
 (*******************************************************)
 
