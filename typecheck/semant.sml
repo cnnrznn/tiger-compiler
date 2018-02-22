@@ -184,14 +184,20 @@ and transRecordExp(tenv, venv, A.RecordExp{fields,typ, pos}) =
 
 (*******************************************************)
 
-and transSeqExp(tenv, venv, A.SeqExp ((exp, pos)::rest)) =
-	let
+and transSeqExp(tenv, venv, A.SeqExp ((exp, pos)::(onemore::rest))) =
+        (transExp(tenv, venv, exp);
+        transSeqExp(tenv, venv, A.SeqExp(onemore::rest)))
+  | transSeqExp(tenv, venv, A.SeqExp ((exp, pos)::[])) =
+        let val {exp=_, ty=tyexp} = transExp(tenv, venv, exp)
+        in tyexp
+        end
+        (*let
 		val {exp=_ , ty=tyExp} = transExp(tenv, venv, exp)
 	in 
 		case rest 
 		of Nil	=> actual_ty tyExp
 		| _ 	=>transSeqExp(tenv, venv, A.SeqExp rest)
-	end
+	end*)
 	
 (*******************************************************)
 
@@ -256,7 +262,7 @@ and transForExp(tenv, venv, A.ForExp {var, escape, lo, hi, body, pos}) =
 	let 
 		val {exp=_ , ty=tyLo} = transExp(tenv, venv, lo)
 		val {exp=_ , ty=tyHi} = transExp(tenv, venv, hi)
-        val venv' = S.enter(venv, name, VarEnt T.INT)
+        val venv' = S.enter(venv, var, VarEnt T.INT)
 	in
 		case (actual_ty tyLo, actual_ty tyHi)
 		of (T.INT, T.INT) =>
@@ -379,44 +385,32 @@ and transFunHed(tenv, venv, []) =
         {te=tenv, ve=venv}
   | transFunHed(tenv, venv, {name, params, result, body, pos}::fundecs) =
         let
-                fun params2types({name, escape, typ, pos}::params)=
-                        (case S.look(tenv, typ) of
-                          SOME t => (t :: params2types(params))
-                        | NONE => ((* TODO throw error *)
-                                   T.INT :: params2types(params)))
-                  | params2types([]) = []
-        in
-                {te=tenv, ve=venv}
-        end
-        (*let
-          fun params2types({name, escape, typ, pos}::params) =
-                (case S.look(typ) of
-                  SOME t => t :: params2types(params)
-                | NONE => (ErrorMsg.error pos "parameter type not defined in scope";
-                           T.INT :: params2types(params)))
-            | params2types([]) = []
-          fun genFunEnt({name, params, result, body, pos}) =
-                (case result of
-                  SOME(sym, pos) => (
+          fun params2types([]) = []
+            | params2types({name, escape, typ, pos}::rest) =
+                (case S.look(tenv, typ) of
+                   SOME t => (t :: params2types(rest))
+                |  NONE => ((* TODO error *)
+                            (T.INT :: params2types(rest)))
+                )
+          fun resTy(typ) = (
+                case typ of
+                  SOME (sym, pos) => (
                         case S.look(tenv, sym) of
-                          SOME t => (params2types(params), t)
-                        | NONE => (ErrorMsg.error pos "function result is undeclared type";
-                                   (params2types(params), T.INT))
+                          SOME t => t
+                        | NONE => (ErrorMsg.error pos "undeclared function return type";
+                                   T.INT)
                         )
-                | NONE => (params2types(params), T.UNIT))
-        in
-        let
-          val venv' = S.enter(venv, name, genFunEnt({name, params, result, body, pos}))
+                | NONE => T.UNIT
+                )
+          val venv' = S.enter(venv, name, FunEnt{params=params2types(params), res=resTy(result)})
         in transFunHed(tenv, venv', fundecs)
         end
-        end*)
 
 and transFunBod(tenv, venv, A.FunctionDec []) = ()
   | transFunBod(tenv, venv, A.FunctionDec({name, params, result, body, pos}::fundecs)) =
         ((case S.look(venv, name)
-         of SOME(T.NAME(name, tyopref)) =>
-                        (*tyopref := transFun(venv, {name, params, result, body, pos})*)
-                        ()
+         of SOME(FunEnt{params, res}) =>
+                        (* TODO create new environment, translate expression 'body' *) ()
           | _ => (ErrorMsg.error pos "should never see this (fun)";
                   ()
                 ));
@@ -476,7 +470,7 @@ case exp of
 | A.RecordExp recexp =>
         {exp=(), ty=transRecordExp(tenv, venv, A.RecordExp recexp)}
 | A.SeqExp seqexp =>
-        {exp=(), ty=transSeqExp(tenv, venv,  A.SeqExp seqexp)}
+        {exp=(), ty=transSeqExp(tenv, venv, A.SeqExp seqexp)}
 | A.AssignExp assignexp =>
         {exp=(), ty=transAssignExp(tenv, venv, A.AssignExp assignexp)}
 | A.IfExp ifexp =>
