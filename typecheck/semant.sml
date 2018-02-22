@@ -219,11 +219,12 @@ and transWhileExp(tenv, venv, A.WhileExp {test, body, pos}) =
 		val {exp=_ , ty=tyTest} = transExp(tenv, venv, test)
 		val {exp=_ , ty=tyBody} = transExp(tenv, venv, body)
 	in
-		if actual_ty tyTest = T.INT then
-			actual_ty tyBody
-		else
-			(ErrorMsg.error pos "Test is not integer value";
-                                T.UNIT)
+		case actual_ty tyTest, actual_ty tyBody
+			of T.INT, T.UNIT => T.UNIT
+			| T.INT, _		 =>(ErrorMsg.error pos "Body must produce no value";
+								T.UNIT)
+			| _, T.UNIT		 => (ErrorMsg.error pos "Test is not integer value";
+								T.UNIT)
 	end
 
 (*******************************************************)
@@ -244,19 +245,18 @@ and transBreakExp(tenv, venv, var) =
 
 and transArrayExp(tenv, venv, A.ArrayExp {typ,size,init,pos}) =
 		(case S.look(tenv,typ)
-		 of SOME (T.ARRAY(arrty,u)) => (let
-										val {exp=_ , ty=tySize} = transExp(tenv, venv, size)
-										val {exp=_ , ty=tyInit} = transExp(tenv, venv, init)
-        							in
-										if actual_ty tySize = T.INT then
-											if checkDecType(actual_ty arrty, actual_ty tyInit) then
-                                	 			arrty 	
-                        					else (  ErrorMsg.error pos "type mismatch";
-                                				 T.INT) 		
-										else
-											(ErrorMsg.error pos ("Array Size must be an Integer ");
-                        					T.INT)	
-									end)
+		 of SOME (T.ARRAY(arrty,u)) => 
+			(let
+				val {exp=_ , ty=tySize} = transExp(tenv, venv, size)
+				val {exp=_ , ty=tyInit} = transExp(tenv, venv, init)
+        	in
+				if actual_ty tySize = T.INT then
+					if checkDecType(actual_ty arrty, actual_ty tyInit) then
+						arrty
+					else (  ErrorMsg.error pos "type mismatch";T.INT)
+				else
+					(ErrorMsg.error pos ("Array Size must be an Integer ");T.INT)
+			end)
 			| NONE => (ErrorMsg.error pos ("undefined type " ^ S.name typ);
                         T.INT))
 
