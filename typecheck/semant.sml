@@ -1,6 +1,6 @@
-structure A = Absyn
-structure S = Symbol
-structure T = Types
+structure A = Absyn     (* ABISMAL *)
+structure S = Symbol    (* SUCKER for *)
+structure T = Types     (* TORMENT *)
 
 structure Translate = struct type exp = unit end
 
@@ -18,7 +18,12 @@ datatype envent = VarEnt of T.ty
 (* type                                                 *)
 fun actual_ty ty =
         case ty
-         of T.NAME ty' => actual_ty(T.NAME ty')
+         of T.NAME(_, tyopref) => (
+                case !tyopref
+                 of SOME ty' => actual_ty ty'
+                  | NONE => (ErrorMsg.error 0 "error translating type pseudonym";
+                             T.INT)
+                )
           | ty' => ty'
 
 (********************************************************)
@@ -37,6 +42,8 @@ fun findFieldType(T.RECORD((id1, ty)::rest, u), id2, pos) =
         )
 
 (********************************************************)
+(* Functions for checking legal declaration and         *)
+(* expression type pairings                             *)
 
 fun checkDecType(T.RECORD(_, u1), T.RECORD(_, u2)) = u1 = u2
   | checkDecType(T.RECORD(_, _), T.NIL) = true
@@ -44,8 +51,6 @@ fun checkDecType(T.RECORD(_, u1), T.RECORD(_, u2)) = u1 = u2
   | checkDecType(T.STRING, T.STRING) = true
   | checkDecType(T.ARRAY(_, u1), T.ARRAY(_, u2)) = u1 = u2
   | checkDecType(_, _) = false
-
-(********************************************************)
 
 fun checkSame(T.RECORD(_, u1), T.RECORD(_, u2)) = u1 = u2
   | checkSame(T.RECORD(_, _), T.NIL) = true
@@ -55,6 +60,8 @@ fun checkSame(T.RECORD(_, u1), T.RECORD(_, u2)) = u1 = u2
   | checkSame(T.ARRAY(_, u1), T.ARRAY(_, u2)) = u1 = u2
   | checkSame(T.UNIT, T.UNIT) = true
   | checkSame(_, _) = false
+
+(********************************************************)
 
 
 (********************************************************)
@@ -285,6 +292,28 @@ and transVarExp(tenv, venv, A.SimpleVar(id,pos)) =
 
 (*******************************************************)
 
+and transTy(tenv, A.NameTy(sym, pos)) =
+        (case S.look(tenv, sym) of
+          SOME t => t
+        | NONE => (ErrorMsg.error pos "type not defined in this scope";
+                   T.INT)
+        )
+  | transTy(tenv, A.RecordTy(fields)) =
+        let fun fields2types({name, escape, typ, pos}::rest) =
+                (case S.look(tenv, typ) of
+                   SOME t => (name, t) :: fields2types(rest)
+                 | NONE => (ErrorMsg.error pos "field type not defined in scope";
+                        (name, T.INT) :: fields2types(rest))
+                )
+              | fields2types([]) = []
+        in T.RECORD(fields2types(fields), ref ())
+        end
+  | transTy(tenv, A.ArrayTy(sym, pos)) =
+        case S.look(tenv, sym) of
+          SOME t => T.ARRAY(t, ref ())
+        | NONE => (ErrorMsg.error pos "array type not defined in scope";
+                   T.ARRAY(T.INT, ref ()))
+
 and transVarDec(tenv, venv, A.VarDec{name, escape, typ, init, pos}) =
         let val {exp=(), ty=tyexp} = transExp(tenv, venv, init)
         in
@@ -304,43 +333,84 @@ and transVarDec(tenv, venv, A.VarDec{name, escape, typ, init, pos}) =
           | NONE => {te=tenv, ve=S.enter(venv, name, VarEnt tyexp)}
         end
 
-and transFunDec(tenv, venv, []) =
+and transFunHed(tenv, venv, []) =
         {te=tenv, ve=venv}
-  | transFunDec(tenv, venv, {name, params, result, body, pos}::fundecs) =
-        {te=tenv, ve=venv} (* TODO *)
+  | transFunHed(tenv, venv, {name, params, result, body, pos}::fundecs) =
+        let
+                fun params2types({name, escape, typ, pos}::params)=
+                        (case S.look(tenv, typ) of
+                          SOME t => (t :: params2types(params))
+                        | NONE => ((* TODO throw error *)
+                                   T.INT :: params2types(params)))
+                  | params2types([]) = []
+        in
+                {te=tenv, ve=venv}
+        end
+        (*let
+          fun params2types({name, escape, typ, pos}::params) =
+                (case S.look(typ) of
+                  SOME t => t :: params2types(params)
+                | NONE => (ErrorMsg.error pos "parameter type not defined in scope";
+                           T.INT :: params2types(params)))
+            | params2types([]) = []
+          fun genFunEnt({name, params, result, body, pos}) =
+                (case result of
+                  SOME(sym, pos) => (
+                        case S.look(tenv, sym) of
+                          SOME t => (params2types(params), t)
+                        | NONE => (ErrorMsg.error pos "function result is undeclared type";
+                                   (params2types(params), T.INT))
+                        )
+                | NONE => (params2types(params), T.UNIT))
+        in
+        let
+          val venv' = S.enter(venv, name, genFunEnt({name, params, result, body, pos}))
+        in transFunHed(tenv, venv', fundecs)
+        end
+        end*)
+
+and transFunBod(tenv, venv, A.FunctionDec []) = ()
+  | transFunBod(tenv, venv, A.FunctionDec({name, params, result, body, pos}::fundecs)) =
+        ((case S.look(venv, name)
+         of SOME(T.NAME(name, tyopref)) =>
+                        (*tyopref := transFun(venv, {name, params, result, body, pos})*)
+                        ()
+          | _ => (ErrorMsg.error pos "should never see this (fun)";
+                  ()
+                ));
+        transFunBod(tenv, venv, A.FunctionDec(fundecs))
+        )
 
 and transTypHed(tenv, venv, []) =
         {te=tenv, ve=venv}
   | transTypHed(tenv, venv, {name, ty, pos}::typedecs) =
-        let val tenv' = S.enter(tenv, name, Types.NAME(name, ref NONE))
-        in {te=tenv', ve=venv}
+        let val tenv' = S.enter(tenv, name, T.NAME(name, ref NONE))
+        in transTypHed(tenv', venv, typedecs)
         end
 
-and transTypBod(tenv, venv, []) =
-        {te=tenv, ve=venv}
+and transTypBod(tenv, venv, []) = ()
   | transTypBod(tenv, venv, {name, ty, pos}::typedecs) =
-        case S.look(tenv, name)
-         of NONE => (   ErrorMsg.error pos "should never see this";
-                        {te=tenv, ve=venv}
-                        )
-          | SOME tableEnt => (
-                case ty
-                 of A.NameTy(sym pos) =>()
-                  | A.RecordTy(fields) => ()
-                  | A.ArrayTy(sym, pos) => ()
-                )
+        ((case S.look(tenv, name)
+         of SOME(T.NAME(name, tyopref)) =>
+                        tyopref := SOME(transTy(tenv, ty))
+          | _ => (ErrorMsg.error pos "should never see this (type)";
+                  ()
+                ));
+        transTypBod(tenv, venv, typedecs))
 
-and transDecs(tenv, venv, A.FunctionDec dec::decs) =
-        let val {te=tenv', ve=venv'} = transFunHed(tenv, venv, dec)
-            val {te=tenv'', ve=venv''} = transFunBod(tenv', venv', dec)
-        in transDecs(tenv'', venv'', decs) end
-  | transDecs(tenv, venv, A.VarDec dec::decs) =
+and transDecs(tenv, venv, A.VarDec dec::decs) =
         let val {te=tenv', ve=venv'} = transVarDec(tenv, venv, A.VarDec dec)
         in transDecs(tenv', venv', decs) end
   | transDecs(tenv, venv, A.TypeDec dec::decs) =
         let val {te=tenv', ve=venv'} = transTypHed(tenv, venv, dec)
-            val {te=tenv'', ve=venv''} = transTypBod(tenv', venv', dec)
-        in transDecs(tenv'', venv'', decs) end
+        in transTypBod(tenv', venv', dec);
+           transDecs(tenv', venv', decs)
+        end
+  | transDecs(tenv, venv, A.FunctionDec dec::decs) =
+        let val {te=tenv', ve=venv'} = transFunHed(tenv, venv, dec)
+        in transFunBod(tenv', venv', A.FunctionDec dec);
+           transDecs(tenv', venv', decs)
+        end
   | transDecs(tenv, venv, []) =
         {te=tenv, ve=venv}
 
@@ -406,7 +476,8 @@ and transProg(exp) =
                 val venv = Symbol.enter(venv, Symbol.symbol "exit",     FunEnt {params=[T.INT], res=T.UNIT});
         in
                 PrintAbsyn.print(TextIO.stdOut, Parse.parse "test1.tig");
+
                 (* recurse *)
-                ()
+                transExp(tenv, venv, exp)
         end
 end
