@@ -243,10 +243,24 @@ and transWhileExp(tenv, venv, A.WhileExp {test, body, pos}) =
 
 (*******************************************************)
 
-and transForExp(tenv, venv, var) =
-        let
-        in T.INT
-        end
+and transForExp(tenv, venv, A.ForExp {var, escape, lo, hi, body, pos}) =
+	let 
+		val {exp=_ , ty=tyLo} = transExp(tenv, venv, lo)
+		val {exp=_ , ty=tyHi} = transExp(tenv, venv, hi)
+        val venv' = S.enter(venv, name, VarEnt T.INT)
+	in
+		case (actual_ty tyLo, actual_ty tyHi)
+		of (T.INT, T.INT) =>
+			let val {exp=_ , ty=tyBody} = transExp(tenv, venv', body)	
+			in
+				case tyBody
+				of T.UNIT => T.UNIT
+				| _ => (ErrorMsg.error pos "Body must produce no value";
+								T.UNIT)
+			end
+		| (_, _) => (ErrorMsg.error pos "lo/hi expressions must be integer value";
+								T.UNIT)
+	end
 
 (*******************************************************)
 
@@ -456,7 +470,7 @@ case exp of
 | A.WhileExp whilexp =>
         {exp=(), ty=transWhileExp(tenv, venv, A.WhileExp whilexp)}
 | A.ForExp forexp =>
-        {exp=(), ty=transForExp(tenv, venv, forexp)}
+        {exp=(), ty=transForExp(tenv, venv, A.ForExp forexp)}
 | A.BreakExp breakexp =>
         {exp=(), ty=transBreakExp(tenv, venv, breakexp)}
 | A.LetExp {decs, body, pos} =>
