@@ -219,11 +219,11 @@ and transWhileExp(tenv, venv, A.WhileExp {test, body, pos}) =
 		val {exp=_ , ty=tyTest} = transExp(tenv, venv, test)
 		val {exp=_ , ty=tyBody} = transExp(tenv, venv, body)
 	in
-		case actual_ty tyTest, actual_ty tyBody
-			of T.INT, T.UNIT => T.UNIT
-			| T.INT, _		 =>(ErrorMsg.error pos "Body must produce no value";
+		case (actual_ty tyTest, actual_ty tyBody)
+			of (T.INT,T.UNIT) => (T.UNIT)
+			| (T.INT,_)		 =>(ErrorMsg.error pos "Body must produce no value";
 								T.UNIT)
-			| _, T.UNIT		 => (ErrorMsg.error pos "Test is not integer value";
+			| (_, T.UNIT)		 => (ErrorMsg.error pos "Test is not integer value";
 								T.UNIT)
 	end
 
@@ -249,7 +249,7 @@ and transArrayExp(tenv, venv, A.ArrayExp {typ,size,init,pos}) =
 			(let
 				val {exp=_ , ty=tySize} = transExp(tenv, venv, size)
 				val {exp=_ , ty=tyInit} = transExp(tenv, venv, init)
-        	in
+ in
 				if actual_ty tySize = T.INT then
 					if checkDecType(actual_ty arrty, actual_ty tyInit) then
 						arrty
