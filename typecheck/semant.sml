@@ -412,14 +412,17 @@ and transFunBod(tenv, venv, A.FunctionDec []) = ()
   | transFunBod(tenv, venv, A.FunctionDec({name, params, result, body, pos}::fundecs)) =
         let fun params2venv(venv, []) = venv
               | params2venv(venv, {name, escape, typ, pos}::params) = (
-                        params2venv(S.enter(venv, name, VarEnt(case S.look(tenv, typ) of
-                                                                SOME t => t | NONE => (*TODO throw error*)T.INT)),
-                                params)
+                        params2venv(S.enter(venv, name,
+                                                VarEnt(case S.look(tenv, typ)
+                                                 of SOME t => t
+                                                  | NONE => (
+                                                      ErrorMsg.error pos "unexpected error finding local variable type";
+                                                      T.INT))),
+                                        params)
               )
         in
         ((case S.look(venv, name)
          of SOME(FunEnt{params=pms, res}) =>
-                        (* TODO create new environment, translate expression 'body' *)
                         (let val venv' = params2venv(venv, params)
                         in transExp(tenv, venv', body)
                         end;
