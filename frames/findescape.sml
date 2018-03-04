@@ -22,11 +22,42 @@ struct
                 traverseExp(env, d, exp);
                 traverseExpList(env, d, explist)
                 )
-        and traverseVar(env:escEnv, d:depth, s:Absyn.var): unit = (
-                )
-        and traverseDecs(env:escEnv, d:depth, s:Absyn.dec list): escEnv = (
-                        env (* TODO *)
-                )
+        and traverseVar(env:escEnv, d:depth, var:A.var): unit =
+                case var
+                 of A.SimpleVar (sym, _) => (
+                        case S.look(env, sym)
+                         of SOME (n, esc) => if n > d then
+                                                 esc := true
+                                             else ()
+                          | NONE => (
+                                ErrorMsg.error 0 "Variable referenced but not declared";
+                                ()
+                                )
+                        )
+                  | A.FieldVar (subvar, sym, _) => (
+                        traverseVar(env, d, subvar);
+                        case S.look(env, sym)
+                         of SOME (n, esc) => if n > d then
+                                                 esc := true
+                                             else ()
+                          | NONE => (
+                                ErrorMsg.error 0 "Variable referenced but not declared";
+                                ()
+                                )
+                        )
+                  | A.SubscriptVar (subvar, exp, _) => (
+                        traverseVar(env, d, subvar);
+                        traverseExp(env, d, exp)
+                        )
+        and traverseDecs(env:escEnv, _, []) = env
+          | traverseDecs(env:escEnv, d:depth, A.TypeDec tydec :: s:A.dec list) =
+                traverseDecs(env, d, s) (* we don't care about type decs *)
+          | traverseDecs(env:escEnv, d:depth, A.VarDec vardec :: s:A.dec list) =
+                let val env' = S.enter(env, #name vardec, (d, #escape vardec))
+                in #escape vardec := false; traverseDecs(env', d, s)
+                end
+          | traverseDecs(env:escEnv, d:depth, A.FunctionDec fd :: s: A.dec list) =
+                traverseDecs(env, d, s)
         and traverseExp(env:escEnv, d:depth, s:Absyn.exp): unit =
                 case s
                  of A.VarExp var => traverseVar(env, d, var)
@@ -57,12 +88,12 @@ struct
                         traverseExp(env, d, exp1);
                         traverseExp(env, d, exp2);
                         let val env' = Symbol.enter(env, v, (d, esc))
-                        in traverseExp(env', d+1, exp3)
+                        in traverseExp(env', d, exp3)
                         end
                         )
                   | A.LetExp {decs=decs, body=body, pos=_} =>
                         let val env' = traverseDecs(env, d, decs)
-                        in traverseExp(env', d+1, body)
+                        in traverseExp(env', d, body)
                         end
                   | A.ArrayExp {typ=_, size=exp1, init=exp2, pos=_} => (
                         traverseExp(env, d, exp1);
