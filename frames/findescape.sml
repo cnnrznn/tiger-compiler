@@ -7,10 +7,25 @@ struct
         type depth = int
         type escEnv = (depth * bool ref) Symbol.table
 
-        fun traverseVar(env:escEnv, d:depth, s:Absyn.var): unit = (
+        fun seq2exps([]) = []
+          | seq2exps((exp, pos)::seqexp) = (
+                exp :: seq2exps(seqexp)
+                )
+
+        fun fields2exps([]) = []
+          | fields2exps((_, exp, _) :: fields) = (
+                exp :: fields2exps(fields)
+                )
+
+        fun traverseExpList(_, _, []) = ()
+          | traverseExpList(env:escEnv, d:depth, exp::explist) = (
+                traverseExp(env, d, exp);
+                traverseExpList(env, d, explist)
+                )
+        and traverseVar(env:escEnv, d:depth, s:Absyn.var): unit = (
                 )
         and traverseDecs(env:escEnv, d:depth, s:Absyn.dec list): escEnv = (
-                        env
+                        env (* TODO *)
                 )
         and traverseExp(env:escEnv, d:depth, s:Absyn.exp): unit =
                 case s
@@ -18,8 +33,8 @@ struct
                   | A.CallExp {func=_, args=exps, pos=_} =>
                         traverseExpList(env, d, exps)
                   | A.OpExp {left=expl, oper=_, right=expr, pos=_} =>
-                        traverseExpList(env, d, [left, right])
-                  | A.RecordExp {fields} =>
+                        traverseExpList(env, d, [expl, expr])
+                  | A.RecordExp {fields, typ, pos} =>
                         traverseExpList(env, d, fields2exps(fields))
                   | A.SeqExp seqexp =>
                         traverseExpList(env, d, seq2exps(seqexp))
@@ -35,8 +50,8 @@ struct
                           | NONE => ()
                         )
                   | A.WhileExp {test=exp1, body=exp2, pos=_} => (
-                        traverseExp(exp1);
-                        traverseExp(exp2)
+                        traverseExp(env, d, exp1);
+                        traverseExp(env, d, exp2)
                         )
                   | A.ForExp {var=v, escape=esc, lo=exp1, hi=exp2, body=exp3, pos=_} => (
                         traverseExp(env, d, exp1);
