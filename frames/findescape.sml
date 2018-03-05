@@ -26,7 +26,7 @@ struct
                 case var
                  of A.SimpleVar (sym, _) => (
                         case S.look(env, sym)
-                         of SOME (n, esc) => if n > d then
+                         of SOME (n, esc) => if d > n then
                                                  esc := true
                                              else ()
                           | NONE => (
@@ -34,30 +34,39 @@ struct
                                 ()
                                 )
                         )
-                  | A.FieldVar (subvar, sym, _) => (
-                        traverseVar(env, d, subvar);
-                        case S.look(env, sym)
-                         of SOME (n, esc) => if n > d then
-                                                 esc := true
-                                             else ()
-                          | NONE => (
-                                ErrorMsg.error 0 "Variable referenced but not declared";
-                                ()
-                                )
-                        )
+                  | A.FieldVar (subvar, sym, _) =>
+                        traverseVar(env, d, subvar)
                   | A.SubscriptVar (subvar, exp, _) => (
                         traverseVar(env, d, subvar);
                         traverseExp(env, d, exp)
                         )
+        and traverseFunDec(_, _, []) = ()
+          | traverseFunDec(env:escEnv, d:depth, fd :: fundecs) = (
+                let
+                   fun params2env(env, _, []) = env
+                     | params2env(env, d, p :: params: A.field list) = (
+                         let val env' = S.enter(env, #name p, (d+1, #escape p))
+                         in #escape p := false;
+                            params2env(env', d, params)
+                         end
+                         )
+                   val env' = params2env(env, d, #params fd)
+                in traverseExp(env', d+1, #body fd)
+                end;
+                traverseFunDec(env, d, fundecs)
+                )
         and traverseDecs(env:escEnv, _, []) = env
           | traverseDecs(env:escEnv, d:depth, A.TypeDec tydec :: s:A.dec list) =
                 traverseDecs(env, d, s) (* we don't care about type decs *)
           | traverseDecs(env:escEnv, d:depth, A.VarDec vardec :: s:A.dec list) =
                 let val env' = S.enter(env, #name vardec, (d, #escape vardec))
-                in #escape vardec := false; traverseDecs(env', d, s)
+                in #escape vardec := false;
+                   traverseDecs(env', d, s)
                 end
-          | traverseDecs(env:escEnv, d:depth, A.FunctionDec fd :: s: A.dec list) =
+          | traverseDecs(env:escEnv, d:depth, A.FunctionDec fd :: s: A.dec list) = (
+                traverseFunDec(env, d, fd);
                 traverseDecs(env, d, s)
+                )
         and traverseExp(env:escEnv, d:depth, s:Absyn.exp): unit =
                 case s
                  of A.VarExp var => traverseVar(env, d, var)
