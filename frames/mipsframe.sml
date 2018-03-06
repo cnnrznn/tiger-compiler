@@ -37,3 +37,5 @@ struct
                    else Temp.newTemp
 
 end
+
+structure Frame = MipsFrame

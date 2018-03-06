@@ -17,8 +17,10 @@ struct
 
         val outermost = 0
 
-        fun newLevel{parent=levp, name: Temp.label, formals: bool list} = (
-                )
+        fun newLevel{parent=plev, name: Temp.label, formals: bool list} =
+                let frame = Frame.newFrame({name, formals})
+                in plev + 1
+                end
 
         (********************************************************)
         (* Create a new access for a variable given the level   *)
