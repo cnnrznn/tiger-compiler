@@ -1,16 +1,13 @@
-structure A = Absyn     (* ABISMAL *)
-structure S = Symbol    (* SUCKER for *)
-structure T = Types     (* TORMENT *)
-
-structure Translate = struct type exp = unit end
-
 structure Semant =
 struct
 
 type expty = {exp: Translate.exp, ty: T.ty}
 
-datatype envent = VarEnt of T.ty
-                | FunEnt of { params: T.ty list, res: T.ty }
+datatype envent = VarEnt of {access: Translate.access, T.ty}
+                | FunEnt of {level: Translate.level,
+                                label: Temp.label,
+                                params: T.ty list,
+                                res: T.ty }
 
 val loopLevel = ref 0
 
@@ -474,10 +471,9 @@ and transDecs(tenv, venv, A.VarDec dec::decs) =
 and transExp(tenv, venv, exp) =
 case exp of
   A.OpExp opexp =>
-        (transOpExp(tenv, venv, A.OpExp opexp);
-        {exp=(), ty=T.INT})
+        transOpExp(tenv, venv, A.OpExp opexp)
 | A.VarExp var =>
-        {exp=(), ty=actual_ty(transVarExp(tenv, venv, var))}
+        transVarExp(tenv, venv, var)
 | A.NilExp =>
         {exp=(), ty=T.NIL}
 | A.IntExp n =>
@@ -485,28 +481,28 @@ case exp of
 | A.StringExp(str, p) =>
         {exp=(), ty=T.STRING}
 | A.CallExp callexp =>
-        {exp=(), ty=actual_ty(transCallExp(tenv, venv, A.CallExp callexp))}
+        transCallExp(tenv, venv, A.CallExp callexp)
 | A.RecordExp recexp =>
-        {exp=(), ty=actual_ty(transRecordExp(tenv, venv, A.RecordExp recexp))}
+        transRecordExp(tenv, venv, A.RecordExp recexp)
 | A.SeqExp seqexp =>
-        {exp=(), ty=actual_ty(transSeqExp(tenv, venv, A.SeqExp seqexp))}
+        transSeqExp(tenv, venv, A.SeqExp seqexp)
 | A.AssignExp assignexp =>
-        {exp=(), ty=actual_ty(transAssignExp(tenv, venv, A.AssignExp assignexp))}
+        transAssignExp(tenv, venv, A.AssignExp assignexp)
 | A.IfExp ifexp =>
-        {exp=(), ty=actual_ty(transIfExp(tenv, venv, A.IfExp ifexp))}
+        transIfExp(tenv, venv, A.IfExp ifexp)
 | A.WhileExp whilexp =>
-        {exp=(), ty=actual_ty(transWhileExp(tenv, venv, A.WhileExp whilexp))}
+        transWhileExp(tenv, venv, A.WhileExp whilexp)
 | A.ForExp forexp =>
-        {exp=(), ty=actual_ty(transForExp(tenv, venv, A.ForExp forexp))}
+        transForExp(tenv, venv, A.ForExp forexp)
 | A.BreakExp breakexp =>
-        {exp=(), ty=actual_ty(transBreakExp(tenv, venv,  A.BreakExp breakexp))}
+        transBreakExp(tenv, venv,  A.BreakExp breakexp)
 | A.LetExp {decs, body, pos} =>
         let val {te=tenv', ve=venv'} =
                         transDecs(tenv, venv, decs)
         in transExp(tenv', venv', body)
         end
 | A.ArrayExp arrexp =>
-        {exp=(), ty=actual_ty(transArrayExp(tenv, venv, A.ArrayExp arrexp))}
+        transArrayExp(tenv, venv, A.ArrayExp arrexp)
 
 (*******************************************************)
 
@@ -530,6 +526,8 @@ and transProg(exp) =
                 val venv = Symbol.enter(venv, Symbol.symbol "not",      FunEnt {params=[T.INT], res=T.INT});
                 val venv = Symbol.enter(venv, Symbol.symbol "exit",     FunEnt {params=[T.INT], res=T.UNIT});
         in
+                FE.findEscape(exp);
+
                 (* recurse *)
                 transExp(tenv, venv, exp);
 
