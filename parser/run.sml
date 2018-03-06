@@ -1,3 +1,3 @@
 CM.make "sources.cm";
 
-Parse.parse "test1.tig";
+PrintAbsyn.print(TextIO.stdOut, Parse.parse "test1.tig");
