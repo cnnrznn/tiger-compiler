@@ -6,5 +6,5 @@ sig
                         formals: bool list} -> frame
         val name : frame -> Temp.label
         val formals : frame -> access list
-        vall allocLocal : frame -> bool -> access
+        val allocLocal : frame -> bool -> access
 end
