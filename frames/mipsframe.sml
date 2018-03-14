@@ -3,9 +3,9 @@ struct
 
         datatype access = InFrame of int | InReg of Temp.temp
 
-        type frame = {  label: Temp.label,
-                        formals: access list
-                        nextOffset: int ref
+        type frame = {  label: Temp.label,      (* machine code label *)
+                        formals: access list,   (* location of variables *)
+                        nextOffset: int ref     (* next stack offset    *)
                         (* other things *)
                         }
 
@@ -13,19 +13,18 @@ struct
 
         fun name(f: frame) = #label f
 
-        fun newFrame({name: Temp.label,
-                        formals: bool list}): frame =
-                let val f' = true :: formals
-                    val off = ref 4
-                   fun formals2acc(_, []) = []
-                     | formals2acc(off, f :: flist) =
-                        let val acc = if f then (off := !off - 4;
-                                                Inframe(!off))
-                                      else Temp.newTemp
-                        in acc :: formals2acc(off, flist)
-                        end
+        fun newFrame(name: Temp.label,
+                        formals: bool list): frame =
+                let val off = ref 4
+                    fun formals2acc(_, []) = []
+                      | formals2acc(off, f :: flist) =
+                         let val acc = if f then (off := !off - 4;
+                                                 Inframe(!off))
+                                       else Temp.newTemp
+                         in acc :: formals2acc(off, flist)
+                         end
                 in frame{ label=name,
-                          formals=formals2acc(off, f'),
+                          formals=formals2acc(off, f),
                           nextOffset=off }
                 end
 
@@ -33,8 +32,9 @@ struct
                 let val off = #nextOffset f
                 in if esc then
                         (off := !off - 4;
-                        InFrame(off))
+                        InFrame(!off))
                    else Temp.newTemp
+                end
 
 end
 
