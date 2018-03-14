@@ -1,7 +1,7 @@
 signature TRANSLATE =
 sig
 	type level
-	type accesss (* not the same as Frame.access *)
+	type access (* not the same as Frame.access *)
 
 	val outermost : level
 	val newLevel : {parent: level, name: Temp.label,
@@ -23,22 +23,22 @@ struct
 
         structure Table = IntMapTable(type key=level
                                 fun getInt level = level)
-        val HT = ref Frame.frame Table.empty
+        val HT : Frame.frame Table.table ref = ref Table.empty
 
-        fun init =
-                let val frame = Frame.newFrame(Temp.newLabel, [])
+        fun init () =
+                let val frame = Frame.newFrame{name=Temp.newlabel(), formals=[]}
                     val HT' = Table.enter(!HT, outermost, frame)
                 in HT := HT'
                 end
         (********************************************************)
 
         fun newLevel{parent=plev, name: Temp.label, formals: bool list} =
-                let val frame = Frame.newFrame(name,
-                                                formals = true :: formals)
+                let val frame = Frame.newFrame{name = name,
+                                                formals = true :: formals}
                 in nextLevel := !nextLevel + 1;
                    (* create mapping from nextLevel -> frame *)
                    HT := Table.enter(!HT, !nextLevel, frame);
-                   nextLevel
+                   !nextLevel
                 end
 
         (********************************************************)
@@ -50,8 +50,22 @@ struct
         fun allocLocal (lev:level) (esc:bool) =
                 let val frame = case Table.look(!HT, lev)
                                  of SOME f => f
-                                  | NONE => (ErrorMsg.error "should never see this"; Frame.frame)
-                    val acc = Frame.allocLocal(frame, esc)
+                                  | NONE => (ErrorMsg.error 0 "should never see this";
+                                                {label=Temp.newlabel(),
+                                                 formals=[],
+                                                 nextOffset=ref 4
+                                                })
+                    val acc = Frame.allocLocal(frame)(esc)
                 in (lev, acc)
                 end
+
+        fun formals level =
+                case Table.look(!HT, level)
+                 of SOME frame => let fun makeList(_, []) = []
+                                    | makeList(level, formal :: formals) =
+                                        (level, formal) :: makeList(level, formals)
+                              in makeList(level, #formals frame)
+                              end
+                  | NONE => (ErrorMsg.error 0 "should never see this";
+                                [])
 end

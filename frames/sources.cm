@@ -14,6 +14,13 @@ Group is
 ../typecheck/types.sml
 ../typecheck/semant.sml
 
+temp.sig
+temp.sml
+
+frame.sig
+mipsframe.sml
+
+translate.sml
 findescape.sml
 
 defines.sml
