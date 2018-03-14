@@ -16,10 +16,29 @@ struct
         type access = level * Frame.access
 
         val outermost = 0
+        val nextLevel = ref 0
+
+        (********************************************************)
+        (* A comment should explain this block of code.         *)
+
+        structure Table = IntMapTable(type key=level
+                                fun getInt level = level)
+        val HT = ref Frame.frame Table.empty
+
+        fun init =
+                let val frame = Frame.newFrame(Temp.newLabel, [])
+                    val HT' = Table.enter(!HT, outermost, frame)
+                in HT := HT'
+                end
+        (********************************************************)
 
         fun newLevel{parent=plev, name: Temp.label, formals: bool list} =
-                let frame = Frame.newFrame({name, formals})
-                in plev + 1
+                let val frame = Frame.newFrame(name,
+                                                formals = true :: formals)
+                in nextLevel := !nextLevel + 1;
+                   (* create mapping from nextLevel -> frame *)
+                   HT := Table.enter(!HT, !nextLevel, frame);
+                   nextLevel
                 end
 
         (********************************************************)
@@ -29,6 +48,10 @@ struct
         (* then allocate a Temp.temp. Otherwise, allocate       *)
         (* InFrame.                                             *)
         fun allocLocal (lev:level) (esc:bool) =
-                (lev, if esc then
-                      else)
+                let val frame = case Table.look(!HT, lev)
+                                 of SOME f => f
+                                  | NONE => (ErrorMsg.error "should never see this"; Frame.frame)
+                    val acc = Frame.allocLocal(frame, esc)
+                in (lev, acc)
+                end
 end
