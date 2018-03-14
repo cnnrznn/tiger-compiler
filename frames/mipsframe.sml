@@ -13,19 +13,19 @@ struct
 
         fun name(f: frame) = #label f
 
-        fun newFrame(name: Temp.label,
-                        formals: bool list): frame =
+        fun newFrame{name: Temp.label,
+                        formals: bool list}: frame =
                 let val off = ref 4
                     fun formals2acc(_, []) = []
                       | formals2acc(off, f :: flist) =
                          let val acc = if f then (off := !off - 4;
-                                                 Inframe(!off))
-                                       else Temp.newTemp
+                                                 InFrame(!off))
+                                       else InReg(Temp.newtemp())
                          in acc :: formals2acc(off, flist)
                          end
-                in frame{ label=name,
-                          formals=formals2acc(off, f),
-                          nextOffset=off }
+                in { label=name,
+                     formals=formals2acc(off, formals),
+                     nextOffset=off }
                 end
 
         fun allocLocal (f: frame) (esc: bool) =
@@ -33,7 +33,7 @@ struct
                 in if esc then
                         (off := !off - 4;
                         InFrame(!off))
-                   else Temp.newTemp
+                   else InReg(Temp.newtemp())
                 end
 
 end
