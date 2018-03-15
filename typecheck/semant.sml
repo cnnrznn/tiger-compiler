@@ -1,10 +1,14 @@
 structure Semant =
 struct
 
-type expty = {exp: Translate.exp, ty: T.ty}
+type expty = {exp: unit, ty: T.ty}
 
-datatype envent = VarEnt of T.ty
-                | FunEnt of { params: T.ty list, res: T.ty }
+datatype envent = VarEnt of { access: Translate.access,
+                              ty: T.ty }
+                | FunEnt of { level: Translate.level,
+                              label: Temp.label,
+                              params: T.ty list,
+                              res: T.ty }
 
 val loopLevel = ref 0
 
@@ -101,10 +105,11 @@ fun checkIntsStrsRecsArrs(T.INT, T.INT, _) =
 
 (*******************************************************)
 
-fun transOpExp(tenv, venv, A.OpExp{left, oper, right, pos}) =
+fun transOpExp(tenv, venv, A.OpExp{left, oper, right, pos},
+                        level: Translate.level) =
         let
-                val {exp=_, ty=tyLeft} = transExp(tenv, venv, left)
-                val {exp=_, ty=tyRight} = transExp(tenv, venv, right)
+                val {exp=_, ty=tyLeft} = transExp(tenv, venv, left, level)
+                val {exp=_, ty=tyRight} = transExp(tenv, venv, right, level)
                 (* val atl = actual_ty tyLeft
                 val atr = actual_ty tyRight *)
         in
@@ -122,24 +127,26 @@ fun transOpExp(tenv, venv, A.OpExp{left, oper, right, pos}) =
         end
 
 (*******************************************************)
-and checkFunctionArgs(tenv, venv,(tyFormal::restFormal), res, (exp::restActual), pos) =
+and checkFunctionArgs(tenv, venv,(tyFormal::restFormal), res, (exp::restActual), pos,
+                        level: Translate.level) =
 	(let
-		val {exp=_ , ty = tyExp} = transExp(tenv, venv, exp)
+		val {exp=_ , ty = tyExp} = transExp(tenv, venv, exp, level)
 	 in
 		if checkDecType(actual_ty tyFormal, tyExp) then
-			checkFunctionArgs(tenv, venv,restFormal, res, restActual, pos)
+			checkFunctionArgs(tenv, venv,restFormal, res, restActual, pos, level)
 		else
 			(ErrorMsg.error pos ("Type Mismatch in args");
                         false)	
 	 end
 	)
- | checkFunctionArgs(tenv, venv,[], res, [], pos) = true	
- | checkFunctionArgs(tenv, venv,_,res,_, pos) =(ErrorMsg.error pos ("Incomplete arguments in the function call"); false)
+ | checkFunctionArgs(tenv, venv,[], res, [], pos, _) = true
+ | checkFunctionArgs(tenv, venv,_,res,_, pos, _) =(ErrorMsg.error pos ("Incomplete arguments in the function call"); false)
 
-and transCallExp(tenv, venv, A.CallExp {func,args, pos} ) =
+and transCallExp(tenv, venv, A.CallExp {func,args, pos},
+                        level: Translate.level) =
 	(case S.look(venv,func)
-		of SOME (FunEnt {params, res}) => 
-			if checkFunctionArgs(tenv, venv,params, res, args, pos) then
+		of SOME (FunEnt{level=_, label=_, params=params, res=res}) =>
+			if checkFunctionArgs(tenv, venv, params, res, args, pos, level) then
 				res
 			else (T.INT)		 
 		| _ => (ErrorMsg.error pos ("undeclared function " ^ S.name func);
@@ -150,28 +157,30 @@ and transCallExp(tenv, venv, A.CallExp {func,args, pos} ) =
 (* walking through the record fields and matching the   *)
 (* names and and types.                                 *) 
 
-and checkRecordFields(tenv,venv,T.RECORD((id1, tyRec)::rest, u), ((id2,expRec,posF)::restFields), pos) =
+and checkRecordFields(tenv,venv,T.RECORD((id1, tyRec)::rest, u), ((id2,expRec,posF)::restFields), pos,
+                        level: Translate.level) =
 	(let
-		val {exp=_ , ty = tyExp} = transExp(tenv, venv, expRec) 
+		val {exp=_ , ty = tyExp} = transExp(tenv, venv, expRec, level)
 	in
 		if id1 = id2 then 
 			if checkDecType(actual_ty tyRec, actual_ty tyExp) then
-				checkRecordFields(tenv, venv, T.RECORD(rest, u), restFields, pos)
+				checkRecordFields(tenv, venv, T.RECORD(rest, u), restFields, pos, level)
 			else
 				(ErrorMsg.error posF ("type mismatch in record field " ^ S.name id1);
 				false)
 		else (ErrorMsg.error posF ("field names incorrect" ^ S.name id1);
                 false)
 	end)
-  | checkRecordFields(tenv, venv, T.RECORD([], u), [], pos) = true
-  | checkRecordFields(tenv,venv, _ , _ , pos) =(ErrorMsg.error pos ("mismatched field names");
+  | checkRecordFields(tenv, venv, T.RECORD([], u), [], pos, _) = true
+  | checkRecordFields(tenv,venv, _ , _ , pos, _) =(ErrorMsg.error pos ("mismatched field names");
 								 false)
-and transRecordExp(tenv, venv, A.RecordExp{fields,typ, pos}) =
+and transRecordExp(tenv, venv, A.RecordExp{fields,typ, pos},
+                        level: Translate.level) =
 	(case S.look(tenv,typ)
 		of SOME ty => (
                         let val recty = actual_ty ty
 			in
-                                if checkRecordFields(tenv, venv, recty, fields, pos) then
+                                if checkRecordFields(tenv, venv, recty, fields, pos, level) then
                                         recty
                                 else
                                         (T.INT)
@@ -183,20 +192,23 @@ and transRecordExp(tenv, venv, A.RecordExp{fields,typ, pos}) =
 
 (*******************************************************)
 
-and transSeqExp(tenv, venv, A.SeqExp ((exp, pos)::(onemore::rest))) =
-        (transExp(tenv, venv, exp);
-        transSeqExp(tenv, venv, A.SeqExp(onemore::rest)))
-  | transSeqExp(tenv, venv, A.SeqExp ((exp, pos)::[])) =
-        let val {exp=_, ty=tyexp} = transExp(tenv, venv, exp)
+and transSeqExp(tenv, venv, A.SeqExp ((exp, pos)::(onemore::rest)),
+                        level: Translate.level) =
+        (transExp(tenv, venv, exp, level);
+        transSeqExp(tenv, venv, A.SeqExp(onemore::rest), level))
+  | transSeqExp(tenv, venv, A.SeqExp ((exp, pos)::[]),
+                        level: Translate.level) =
+        let val {exp=_, ty=tyexp} = transExp(tenv, venv, exp, level)
         in tyexp
         end
 	
 (*******************************************************)
 
-and transAssignExp(tenv, venv, A.AssignExp{var,exp, pos}) =
+and transAssignExp(tenv, venv, A.AssignExp{var,exp, pos},
+                        level: Translate.level) =
 	let 
-		val tyVar = transVarExp(tenv, venv, var)
-		val {exp=_ , ty=tyExp} = transExp(tenv, venv, exp)
+		val tyVar = transVarExp(tenv, venv, var, level)
+		val {exp=_ , ty=tyExp} = transExp(tenv, venv, exp, level)
 	in
 		if checkDecType(tyVar, tyExp) then
                                 T.UNIT
@@ -206,15 +218,16 @@ and transAssignExp(tenv, venv, A.AssignExp{var,exp, pos}) =
 
 (*******************************************************)
 
-and transIfExp(tenv, venv, A.IfExp{test, then', else', pos}) =
+and transIfExp(tenv, venv, A.IfExp{test, then', else', pos},
+                        level: Translate.level) =
         let
-                val {exp=_ , ty=tyTest} = transExp(tenv, venv, test)
-                val {exp=_ , ty=tyThen} = transExp(tenv, venv, then')
+                val {exp=_ , ty=tyTest} = transExp(tenv, venv, test, level)
+                val {exp=_ , ty=tyThen} = transExp(tenv, venv, then', level)
         in 
                 if tyTest = T.INT then
                         case else'
                         of SOME e =>
-                                let val {exp=_ , ty=tyElse} = transExp(tenv, venv, e)
+                                let val {exp=_ , ty=tyElse} = transExp(tenv, venv, e, level)
                                 in
                                         if checkSame(tyThen, tyElse) then(
                                                 case tyThen
@@ -231,12 +244,13 @@ and transIfExp(tenv, venv, A.IfExp{test, then', else', pos}) =
 
 (*******************************************************)
 (* Does produce no value means T.UNIT? *)
-and transWhileExp(tenv, venv, A.WhileExp {test, body, pos}) =
+and transWhileExp(tenv, venv, A.WhileExp {test, body, pos},
+                        level: Translate.level) =
 	let
-		val {exp=_ , ty=tyTest} = transExp(tenv, venv, test);
+		val {exp=_ , ty=tyTest} = transExp(tenv, venv, test, level)
 	in loopLevel := !loopLevel + 1;
 		let
-			val {exp=_ , ty=tyBody} = transExp(tenv, venv, body)
+			val {exp=_ , ty=tyBody} = transExp(tenv, venv, body, level)
 		in
         loopLevel := !loopLevel - 1;
 		case (tyTest, tyBody)
@@ -250,17 +264,18 @@ and transWhileExp(tenv, venv, A.WhileExp {test, body, pos}) =
 
 (*******************************************************)
 
-and transForExp(tenv, venv, A.ForExp {var, escape, lo, hi, body, pos}) =
+and transForExp(tenv, venv, A.ForExp {var, escape, lo, hi, body, pos}, level: Translate.level) =
 	let 
-		val {exp=_ , ty=tyLo} = transExp(tenv, venv, lo)
-		val {exp=_ , ty=tyHi} = transExp(tenv, venv, hi)
-        val venv' = S.enter(venv, var, VarEnt T.INT)
+		val {exp=_ , ty=tyLo} = transExp(tenv, venv, lo, level)
+		val {exp=_ , ty=tyHi} = transExp(tenv, venv, hi, level)
+        val venv' = S.enter(venv, var, VarEnt{access=Translate.allocLocal(level)(!escape),
+                                              ty=T.INT})
 	in
 		case (actual_ty tyLo, actual_ty tyHi)
 		of (T.INT, T.INT) =>
 			(loopLevel := !loopLevel + 1;
 			let 
-				val {exp=_ , ty=tyBody} = transExp(tenv, venv', body)	
+				val {exp=_ , ty=tyBody} = transExp(tenv, venv', body, level)
 			in
 				loopLevel := !loopLevel - 1;
 				case tyBody
@@ -274,7 +289,7 @@ and transForExp(tenv, venv, A.ForExp {var, escape, lo, hi, body, pos}) =
 
 (*******************************************************)
 
-and transBreakExp(tenv, venv,  A.BreakExp pos ) =
+and transBreakExp(tenv, venv,  A.BreakExp pos, level: Translate.level) =
 	( if !loopLevel = 0 then
 		(ErrorMsg.error pos "Illegal break. No enclosing While/For loop";
 								T.UNIT)
@@ -283,14 +298,15 @@ and transBreakExp(tenv, venv,  A.BreakExp pos ) =
 
 (*******************************************************)
 
-and transArrayExp(tenv, venv, A.ArrayExp {typ,size,init,pos}) = (
+and transArrayExp(tenv, venv, A.ArrayExp {typ,size,init,pos},
+                        level: Translate.level) = (
         case S.look(tenv,typ) of
           SOME (ty) => (
                 let
                         val arrty = actual_ty ty
                         val T.ARRAY(itemty, _) = arrty
-                        val {exp=_ , ty=tySize} = transExp(tenv, venv, size)
-                        val {exp=_ , ty=tyInit} = transExp(tenv, venv, init)
+                        val {exp=_ , ty=tySize} = transExp(tenv, venv, size, level)
+                        val {exp=_ , ty=tyInit} = transExp(tenv, venv, init, level)
                 in
                         if tySize = T.INT then
                                 if checkDecType(itemty, tyInit) then
@@ -306,23 +322,26 @@ and transArrayExp(tenv, venv, A.ArrayExp {typ,size,init,pos}) = (
 
 (*******************************************************)
 
-and transVarExp(tenv, venv, A.SimpleVar(id,pos)) =
+and transVarExp(tenv, venv, A.SimpleVar(id,pos),
+                        level: Translate.level) =
         (case Symbol.look(venv, id)
-         of SOME (VarEnt ty) => actual_ty ty
+         of SOME (VarEnt{access=_, ty=ty}) => actual_ty ty
           | NONE => (ErrorMsg.error pos ("undefined variable " ^
                                                 S.name id);
                         T.INT)
         )
-  | transVarExp(tenv, venv, A.FieldVar(var, id, pos)) =
-        (case transVarExp(tenv, venv, var)
+  | transVarExp(tenv, venv, A.FieldVar(var, id, pos),
+                        level: Translate.level) =
+        (case transVarExp(tenv, venv, var, level)
          of T.RECORD record => (findFieldType(T.RECORD record, id, pos))
           | _ => (ErrorMsg.error pos "Accessing a field in non-record type";
                         T.INT)
         )
-  | transVarExp(tenv, venv, A.SubscriptVar(var, exp, pos)) =
-        (case transVarExp(tenv, venv, var)
+  | transVarExp(tenv, venv, A.SubscriptVar(var, exp, pos),
+                        level: Translate.level) =
+        (case transVarExp(tenv, venv, var, level)
          of T.ARRAY(arrty, unique) => (
-                let val {exp, ty=tyexp} = transExp(tenv, venv, exp)
+                let val {exp, ty=tyexp} = transExp(tenv, venv, exp, level)
                 in
                   case tyexp
                     of T.INT => (actual_ty arrty)
@@ -358,15 +377,17 @@ and transTy(tenv, A.NameTy(sym, pos)) =
         | NONE => (ErrorMsg.error pos "array type not defined in scope";
                    T.ARRAY(T.INT, ref ()))
 
-and transVarDec(tenv, venv, A.VarDec{name, escape, typ, init, pos}) =
-        let val {exp=(), ty=tyexp} = transExp(tenv, venv, init)
+and transVarDec(tenv, venv, A.VarDec{name, escape, typ, init, pos}, level: Translate.level) =
+        let val {exp=(), ty=tyexp} = transExp(tenv, venv, init, level)
         in
         case typ
          of SOME(id, p) => (
                 case Symbol.look(tenv, id)
                  of SOME typ =>
                         if checkDecType(actual_ty typ, actual_ty tyexp) then
-                                {te=tenv, ve=S.enter(venv, name, VarEnt tyexp)}
+                                {te=tenv, ve=S.enter(venv, name,
+                                                VarEnt{access=Translate.allocLocal(level)(!escape),
+                                                       ty=tyexp})}
                         else (  ErrorMsg.error p "type mismatch";
                                 {te=tenv, ve=venv}
                         )
@@ -374,12 +395,12 @@ and transVarDec(tenv, venv, A.VarDec{name, escape, typ, init, pos}) =
                                 {te=tenv, ve=venv}
                         )
                 )
-          | NONE => {te=tenv, ve=S.enter(venv, name, VarEnt tyexp)}
+          | NONE => {te=tenv, ve=S.enter(venv, name, VarEnt{access=Translate.allocLocal(level)(!escape), ty=tyexp})}
         end
 
-and transFunHed(tenv, venv, []) =
+and transFunHed(tenv, venv, [], _) =
         {te=tenv, ve=venv}
-  | transFunHed(tenv, venv, {name, params, result, body, pos}::fundecs) =
+  | transFunHed(tenv, venv, {name, params, result, body, pos}::fundecs, level: Translate.level) =
         let
           fun params2types([]) = []
             | params2types({name, escape, typ, pos}::rest) =
@@ -398,36 +419,44 @@ and transFunHed(tenv, venv, []) =
                         )
                 | NONE => T.UNIT
                 )
-          val venv' = S.enter(venv, name, FunEnt{params=params2types(params), res=resTy(result)})
-        in transFunHed(tenv, venv', fundecs)
+          fun params2bools([]) = []
+          val newlabel = Temp.newlabel()
+          val venv' = S.enter(venv, name, FunEnt{level=Translate.newLevel{parent=level,
+                                                                          name=newlabel,
+                                                                          formals=[]},
+                                                 label=newlabel,
+                                                 params=params2types(params),
+                                                 res=resTy(result)})
+        in transFunHed(tenv, venv', fundecs, level)
         end
 
-and transFunBod(tenv, venv, A.FunctionDec []) = ()
-  | transFunBod(tenv, venv, A.FunctionDec({name, params, result, body, pos}::fundecs)) =
+and transFunBod(tenv, venv, A.FunctionDec [], _) = ()
+  | transFunBod(tenv, venv, A.FunctionDec({name=name, params=paramsAbsyn, result=result, body=body, pos=pos}::fundecs), level: Translate.level) =
         let fun params2venv(venv, []) = venv
               | params2venv(venv, {name, escape, typ, pos}::params) = (
                         params2venv(S.enter(venv, name,
-                                                VarEnt(case S.look(tenv, typ)
-                                                 of SOME t => t
-                                                  | NONE => (
-                                                      ErrorMsg.error pos "unexpected error finding local variable type";
-                                                      T.INT))),
+                                                VarEnt{access=Translate.allocLocal(level)(!escape),
+                                                        ty=(case S.look(tenv, typ)
+                                                         of SOME t => t
+                                                          | NONE => (
+                                                              ErrorMsg.error pos "unexpected error finding local variable type";
+                                                              T.INT))}),
                                         params)
               )
         in
         ((case S.look(venv, name)
-         of SOME(FunEnt{params=pms, res}) =>
-                        (let val venv' = params2venv(venv, params)
-                        in transExp(tenv, venv', body)
+         of SOME(FunEnt{level=bodyLev, label=_, params=parambools, res=res}) =>
+                        (let val venv' = params2venv(venv, paramsAbsyn)
+                        in transExp(tenv, venv', body, bodyLev)
                         end;
                         ())
           | _ => (ErrorMsg.error pos "should never see this (fun)";
                   ()
                 ));
-        transFunBod(tenv, venv, A.FunctionDec(fundecs))
+        transFunBod(tenv, venv, A.FunctionDec(fundecs), level)
         )
         end
-  | transFunBod(_, _, _) =
+  | transFunBod(_, _, _, _) =
         (ErrorMsg.error 0 "unexpected error"; ())
 
 and transTypHed(tenv, venv, []) =
@@ -447,31 +476,31 @@ and transTypBod(tenv, venv, []) = ()
                 ));
         transTypBod(tenv, venv, typedecs))
 
-and transDecs(tenv, venv, A.VarDec dec::decs) =
-        let val {te=tenv', ve=venv'} = transVarDec(tenv, venv, A.VarDec dec)
-        in transDecs(tenv', venv', decs) end
-  | transDecs(tenv, venv, A.TypeDec dec::decs) =
+and transDecs(tenv, venv, A.VarDec dec::decs, level: Translate.level) =
+        let val {te=tenv', ve=venv'} = transVarDec(tenv, venv, A.VarDec dec, level)
+        in transDecs(tenv', venv', decs, level) end
+  | transDecs(tenv, venv, A.TypeDec dec::decs, level: Translate.level) =
         let val {te=tenv', ve=venv'} = transTypHed(tenv, venv, dec)
         in transTypBod(tenv', venv', dec);
-           transDecs(tenv', venv', decs)
+           transDecs(tenv', venv', decs, level)
         end
-  | transDecs(tenv, venv, A.FunctionDec dec::decs) =
-        let val {te=tenv', ve=venv'} = transFunHed(tenv, venv, dec)
-        in transFunBod(tenv', venv', A.FunctionDec dec);
-           transDecs(tenv', venv', decs)
+  | transDecs(tenv, venv, A.FunctionDec dec::decs, level: Translate.level) =
+        let val {te=tenv', ve=venv'} = transFunHed(tenv, venv, dec, level)
+        in transFunBod(tenv', venv', A.FunctionDec dec, level);
+           transDecs(tenv', venv', decs, level)
         end
-  | transDecs(tenv, venv, []) =
+  | transDecs(tenv, venv, [], _) =
         {te=tenv, ve=venv}
 
 (*******************************************************)
 
-and transExp(tenv, venv, exp) =
+and transExp(tenv, venv, exp, level: Translate.level) =
 case exp of
   A.OpExp opexp =>
-        (transOpExp(tenv, venv, A.OpExp opexp);
+        (transOpExp(tenv, venv, A.OpExp opexp, level);
         {exp=(), ty=T.INT})
 | A.VarExp var =>
-        {exp=(), ty=actual_ty(transVarExp(tenv, venv, var))}
+        {exp=(), ty=actual_ty(transVarExp(tenv, venv, var, level))}
 | A.NilExp =>
         {exp=(), ty=T.NIL}
 | A.IntExp n =>
@@ -479,57 +508,121 @@ case exp of
 | A.StringExp(str, p) =>
         {exp=(), ty=T.STRING}
 | A.CallExp callexp =>
-        {exp=(), ty=actual_ty(transCallExp(tenv, venv, A.CallExp callexp))}
+        {exp=(), ty=actual_ty(transCallExp(tenv, venv, A.CallExp callexp, level))}
 | A.RecordExp recexp =>
-        {exp=(), ty=actual_ty(transRecordExp(tenv, venv, A.RecordExp recexp))}
+        {exp=(), ty=actual_ty(transRecordExp(tenv, venv, A.RecordExp recexp, level))}
 | A.SeqExp seqexp =>
-        {exp=(), ty=actual_ty(transSeqExp(tenv, venv, A.SeqExp seqexp))}
+        {exp=(), ty=actual_ty(transSeqExp(tenv, venv, A.SeqExp seqexp, level))}
 | A.AssignExp assignexp =>
-        {exp=(), ty=actual_ty(transAssignExp(tenv, venv, A.AssignExp assignexp))}
+        {exp=(), ty=actual_ty(transAssignExp(tenv, venv, A.AssignExp assignexp, level))}
 | A.IfExp ifexp =>
-        {exp=(), ty=actual_ty(transIfExp(tenv, venv, A.IfExp ifexp))}
+        {exp=(), ty=actual_ty(transIfExp(tenv, venv, A.IfExp ifexp, level))}
 | A.WhileExp whilexp =>
-        {exp=(), ty=actual_ty(transWhileExp(tenv, venv, A.WhileExp whilexp))}
+        {exp=(), ty=actual_ty(transWhileExp(tenv, venv, A.WhileExp whilexp, level))}
 | A.ForExp forexp =>
-        {exp=(), ty=actual_ty(transForExp(tenv, venv, A.ForExp forexp))}
+        {exp=(), ty=actual_ty(transForExp(tenv, venv, A.ForExp forexp, level))}
 | A.BreakExp breakexp =>
-        {exp=(), ty=actual_ty(transBreakExp(tenv, venv,  A.BreakExp breakexp))}
+        {exp=(), ty=actual_ty(transBreakExp(tenv, venv,  A.BreakExp breakexp, level))}
 | A.LetExp {decs, body, pos} =>
         let val {te=tenv', ve=venv'} =
-                        transDecs(tenv, venv, decs)
-        in transExp(tenv', venv', body)
+                        transDecs(tenv, venv, decs, level)
+        in transExp(tenv', venv', body, level)
         end
 | A.ArrayExp arrexp =>
-        {exp=(), ty=actual_ty(transArrayExp(tenv, venv, A.ArrayExp arrexp))}
+        {exp=(), ty=actual_ty(transArrayExp(tenv, venv, A.ArrayExp arrexp, level))}
 
 (*******************************************************)
 
 and transProg(exp) =
+        (* initialize Translate structure *)
+        (Translate.init();
+
         let
                 val tenv : T.ty Symbol.table = Symbol.empty
                 val venv : envent Symbol.table = Symbol.empty
 
                 (* add base environment *)
-                val tenv = Symbol.enter(tenv, Symbol.symbol "string", T.STRING);
-                val tenv = Symbol.enter(tenv, Symbol.symbol "int", T.INT);
+                val tenv = Symbol.enter(tenv, Symbol.symbol "string", T.STRING)
+                val tenv = Symbol.enter(tenv, Symbol.symbol "int", T.INT)
 
-                val venv = Symbol.enter(venv, Symbol.symbol "print",    FunEnt {params=[T.STRING], res=T.UNIT});
-                val venv = Symbol.enter(venv, Symbol.symbol "flush",    FunEnt {params=[], res=T.UNIT});
-                val venv = Symbol.enter(venv, Symbol.symbol "getchar",  FunEnt {params=[], res=T.STRING});
-                val venv = Symbol.enter(venv, Symbol.symbol "ord",      FunEnt {params=[T.STRING], res=T.INT});
-                val venv = Symbol.enter(venv, Symbol.symbol "chr",      FunEnt {params=[T.INT], res=T.STRING});
-                val venv = Symbol.enter(venv, Symbol.symbol "size",     FunEnt {params=[T.STRING], res=T.INT});
-                val venv = Symbol.enter(venv, Symbol.symbol "substring",FunEnt {params=[T.STRING, T.INT, T.INT], res=T.STRING});
-                val venv = Symbol.enter(venv, Symbol.symbol "concat",   FunEnt {params=[T.STRING, T.STRING], res=T.STRING});
-                val venv = Symbol.enter(venv, Symbol.symbol "not",      FunEnt {params=[T.INT], res=T.INT});
-                val venv = Symbol.enter(venv, Symbol.symbol "exit",     FunEnt {params=[T.INT], res=T.UNIT});
+                val newlabel = Temp.newlabel()
+                val venv = Symbol.enter(venv, Symbol.symbol "print",    FunEnt{level=Translate.newLevel{parent=Translate.outermost,
+                                                                                                        name=newlabel,
+                                                                                                        formals=[false]},
+                                                                                label=newlabel,
+                                                                                params=[T.STRING],
+                                                                                res=T.UNIT})
+                val newlabel = Temp.newlabel()
+                val venv = Symbol.enter(venv, Symbol.symbol "flush",    FunEnt{level=Translate.newLevel{parent=Translate.outermost,
+                                                                                                        name=newlabel,
+                                                                                                        formals=[]},
+                                                                                label=newlabel,
+                                                                                params=[T.UNIT],
+                                                                                res=T.UNIT})
+                val newlabel = Temp.newlabel()
+                val venv = Symbol.enter(venv, Symbol.symbol "getchar",  FunEnt{level=Translate.newLevel{parent=Translate.outermost,
+                                                                                                        name=newlabel,
+                                                                                                        formals=[]},
+                                                                                label=newlabel,
+                                                                                params=[T.UNIT],
+                                                                                res=T.STRING})
+                val newlabel = Temp.newlabel()
+                val venv = Symbol.enter(venv, Symbol.symbol "ord",      FunEnt{level=Translate.newLevel{parent=Translate.outermost,
+                                                                                                        name=newlabel,
+                                                                                                        formals=[false]},
+                                                                                label=newlabel,
+                                                                                params=[T.STRING],
+                                                                                res=T.INT})
+                val newlabel = Temp.newlabel()
+                val venv = Symbol.enter(venv, Symbol.symbol "chr",      FunEnt{level=Translate.newLevel{parent=Translate.outermost,
+                                                                                                        name=newlabel,
+                                                                                                        formals=[false]},
+                                                                                label=newlabel,
+                                                                                params=[T.INT],
+                                                                                res=T.STRING})
+                val newlabel = Temp.newlabel()
+                val venv = Symbol.enter(venv, Symbol.symbol "size",     FunEnt{level=Translate.newLevel{parent=Translate.outermost,
+                                                                                                        name=newlabel,
+                                                                                                        formals=[false]},
+                                                                                label=newlabel,
+                                                                                params=[T.STRING],
+                                                                                res=T.INT})
+                val newlabel = Temp.newlabel()
+                val venv = Symbol.enter(venv, Symbol.symbol "substring",FunEnt{level=Translate.newLevel{parent=Translate.outermost,
+                                                                                                        name=newlabel,
+                                                                                                        formals=[false, false, false]},
+                                                                                label=newlabel,
+                                                                                params=[T.STRING, T.INT, T.INT],
+                                                                                res=T.STRING})
+                val newlabel = Temp.newlabel()
+                val venv = Symbol.enter(venv, Symbol.symbol "concat",   FunEnt{level=Translate.newLevel{parent=Translate.outermost,
+                                                                                                        name=newlabel,
+                                                                                                        formals=[false, false]},
+                                                                                label=newlabel,
+                                                                                params=[T.STRING, T.STRING],
+                                                                                res=T.STRING})
+                val newlabel = Temp.newlabel()
+                val venv = Symbol.enter(venv, Symbol.symbol "not",      FunEnt{level=Translate.newLevel{parent=Translate.outermost,
+                                                                                                        name=newlabel,
+                                                                                                        formals=[false]},
+                                                                               label=newlabel,
+                                                                               params=[T.INT],
+                                                                               res=T.INT})
+                val newlabel = Temp.newlabel()
+                val venv = Symbol.enter(venv, Symbol.symbol "exit",     FunEnt{level=Translate.newLevel{parent=Translate.outermost,
+                                                                                                        name=newlabel,
+                                                                                                        formals=[false]},
+                                                                               label=newlabel,
+                                                                               params=[T.INT],
+                                                                               res=T.UNIT})
         in
+                (* find escaping variables *)
                 FE.findEscape(exp);
 
                 (* recurse *)
-                transExp(tenv, venv, exp);
+                transExp(tenv, venv, exp, Translate.outermost);
 
                 (* return UNIT *)
-                ()
-        end
+                exp
+        end)
 end
