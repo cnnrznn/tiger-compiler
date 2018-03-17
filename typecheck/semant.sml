@@ -30,14 +30,14 @@ fun actual_ty ty =
 (* symbol 'id2'. If it's in the list, return it's type. *)
 (* If not, return T.INT.                            *)
 
-fun findFieldType(T.RECORD((id1, ty)::rest, u), id2, pos) =
-        if id1 = id2 then actual_ty ty
-        else findFieldType(T.RECORD(rest, u), id2, pos)
-  | findFieldType(T.RECORD([], u), id2, pos) =
+fun findFieldType(T.RECORD((id1, ty)::rest, u), id2, fieldIndex, pos) =
+        if id1 = id2 then { index = fieldIndex , ty = actual_ty ty}
+        else findFieldType(T.RECORD(rest, u), id2, fieldIndex + 1, pos)
+  | findFieldType(T.RECORD([], u), id2 , fieldIndex , pos) =
         (ErrorMsg.error pos ("Unable to find symbol " ^
                                 S.name id2 ^
                                 " in record");
-         T.INT
+        { index = ~1 , ty = T.INT}
         )
 
 (********************************************************)
@@ -325,33 +325,46 @@ and transArrayExp(tenv, venv, A.ArrayExp {typ,size,init,pos},
 and transVarExp(tenv, venv, A.SimpleVar(id,pos),
                         level: Translate.level) =
         (case Symbol.look(venv, id)
-         of SOME (VarEnt{access=_, ty=ty}) => actual_ty ty
+         of SOME (VarEnt{access= acc, ty= typ}) => { exp = Translate.simpleVar (acc, level), ty = actual_ty typ}
           | NONE => (ErrorMsg.error pos ("undefined variable " ^
                                                 S.name id);
-                        T.INT)
+                        {exp = (), ty = T.INT})
         )
   | transVarExp(tenv, venv, A.FieldVar(var, id, pos),
                         level: Translate.level) =
-        (case transVarExp(tenv, venv, var, level)
-         of T.RECORD record => (findFieldType(T.RECORD record, id, pos))
-          | _ => (ErrorMsg.error pos "Accessing a field in non-record type";
-                        T.INT)
-        )
+       let
+           val {exp = expVar , ty = tyVar} = transVarExp(tenv, venv, var, level) 
+        in
+            case tyVar
+             of T.RECORD record => (  
+                 let 
+                     val {index = index, ty = ty }  = findFieldType(T.RECORD record, id, 0, pos)
+                 in
+                    {exp = Translate.fieldVar(expVar, index) , ty = ty}
+                 end
+                 )
+              | _ => (ErrorMsg.error pos "Accessing a field in non-record type";
+                        {exp = (), ty =T.INT} )
+        end
   | transVarExp(tenv, venv, A.SubscriptVar(var, exp, pos),
-                        level: Translate.level) =
-        (case transVarExp(tenv, venv, var, level)
-         of T.ARRAY(arrty, unique) => (
-                let val {exp, ty=tyexp} = transExp(tenv, venv, exp, level)
+                        level: Translate.level) =  
+        let 
+            val {exp = expVar , ty = tyVar} = transVarExp(tenv, venv, var, level) 
+        in
+            case tyVar
+             of T.ARRAY(arrty, unique) =>
+                let val {exp = indexExp , ty=tyexp} = transExp(tenv, venv, exp, level)
                 in
                   case tyexp
-                    of T.INT => (actual_ty arrty)
+                    of T.INT => ({exp = Translate.subscriptVar(expVar, indexExp) , ty = actual_ty arrty})
                      | _ => (ErrorMsg.error pos "Array index must be of type INT";
-                                  T.INT)
+                                   { exp = (), ty = T.INT})
                 end
-                )
-          | _ => (ErrorMsg.error pos "Accessing subscript of non-array type";
-                        T.INT)
-        )
+
+              | _ => (ErrorMsg.error pos "Accessing subscript of non-array type";
+                       { exp = (), ty = T.INT})
+        end
+        
 
 (*******************************************************)
 
@@ -499,8 +512,7 @@ case exp of
   A.OpExp opexp =>
         (transOpExp(tenv, venv, A.OpExp opexp, level);
         {exp=(), ty=T.INT})
-| A.VarExp var =>
-        {exp=(), ty=actual_ty(transVarExp(tenv, venv, var, level))}
+| A.VarExp var => transVarExp(tenv, venv, var, level)
 | A.NilExp =>
         {exp=(), ty=T.NIL}
 | A.IntExp n =>
