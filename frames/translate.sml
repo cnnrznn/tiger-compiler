@@ -11,6 +11,8 @@ sig
 	val allocLocal: level -> bool -> access
 
         val simpleVar: access * level -> exp
+        val subscriptVar : exp * exp -> exp
+        val fieldVar: exp * int -> exp
 end
 
 structure Translate : TRANSLATE =
@@ -107,5 +109,20 @@ struct
 		(*Ex(Frame.exp (frAccess) (Tree.TEMP(Frame.FP)) )  *)
                 Ex(followStaticLinks(varLevel, level) )
             end
+        
+        (*****************************************)
+        (* function to translate array subscript variable *)
+    
+       fun subscriptVar(varExp: Frame.exp, indexExp: Frame.exp) =
+          (* doubts - should we use UnEx constructor for the xpressions? is it Tree.PLUS or Tree.MINUS ? *)
+          EX( Tree.MEM( Tree.BINOP( Tree.PLUS, varExp, Tree.BINOP( Tree.MUL,  indexExp , Tree.CONST (Frame.wordSize) ) )))
+
+       
+       (*****************************************)
+       (* function to translate record field variable *)
+     
+       fun fieldVar (varExp : Frame.exp, fieldIndex : int) =
+           Ex( Tree.MEM ( Tree.BINOP ( Tree.PLUS, varExp , Tree.CONST(fieldIndex * Frame.wordSize) ) ) )
+           
 	     
 end
