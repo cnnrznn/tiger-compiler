@@ -325,10 +325,10 @@ and transArrayExp(tenv, venv, A.ArrayExp {typ,size,init,pos},
 and transVarExp(tenv, venv, A.SimpleVar(id,pos),
                         level: Translate.level) =
         (case Symbol.look(venv, id)
-         of SOME (VarEnt{access=_, ty=ty}) => actual_ty ty
+         of SOME (VarEnt{access= acc, ty= typ}) => { exp = Translate.simpleVar (acc, level), ty = actual_ty typ}
           | NONE => (ErrorMsg.error pos ("undefined variable " ^
                                                 S.name id);
-                        T.INT)
+                        {exp = (), ty = T.INT})
         )
   | transVarExp(tenv, venv, A.FieldVar(var, id, pos),
                         level: Translate.level) =
@@ -499,8 +499,7 @@ case exp of
   A.OpExp opexp =>
         (transOpExp(tenv, venv, A.OpExp opexp, level);
         {exp=(), ty=T.INT})
-| A.VarExp var =>
-        {exp=(), ty=actual_ty(transVarExp(tenv, venv, var, level))}
+| A.VarExp var => transVarExp(tenv, venv, var, level)
 | A.NilExp =>
         {exp=(), ty=T.NIL}
 | A.IntExp n =>

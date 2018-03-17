@@ -2,18 +2,25 @@ signature TRANSLATE =
 sig
 	type level
 	type access (* not the same as Frame.access *)
+        type exp
 
 	val outermost : level
 	val newLevel : {parent: level, name: Temp.label,
 	    	       	formals: bool list} -> level
 	val formals: level -> access list
 	val allocLocal: level -> bool -> access
+
+        val simpleVar: access * level -> exp
 end
 
 structure Translate : TRANSLATE =
 struct
-        type level = int
+        type level = {parent : level, frame : Frame.frame, unique : unit ref}
         type access = level * Frame.access
+
+        datatype exp = Ex of Tree.exp
+             | Nx of Tree.stm
+             | Cx of Temp.label * Temp.label -> Tree.stm
 
         val outermost = 0
         val nextLevel = ref 0
@@ -68,4 +75,37 @@ struct
                               end
                   | NONE => (ErrorMsg.error 0 "should never see this";
                                 [])
+        (***********************************************************************)
+        (* This method starts from the current level and follows the static    *)
+        (* links to get to parent level frames until it reaches the declaration*)
+        (* level of the variable. At each level it adds the static link offset *)
+        (* to the frame pointer and finally returns a tree                     *)
+
+        fun followStaticLinks (frAccess:Frame.access, varLevel:level, curLevel: level) =
+           let 
+               val parentLevel = #parent curLevel
+               val frame =  #frame curLevel
+               val sl_access :: formals = Frame.formals(frame)
+                 
+           in
+               if #unique curLevel = #unique varLevel then
+                   Tree.TEMP(Frame.FP)
+               else
+                   Frame.exp (frAccess) followStaticLinks (sl_access ,varLevel, parentLevel)
+           end
+	
+        (*****************************************)
+        (* function to translate simple variable *)
+     
+	    
+        fun simpleVar(acc : access, lev : level) = 
+ 	    let
+		val varLevel = #1 acc
+                val frAccess = #2 acc 
+            in
+                (* following static links implemented*)
+		(*Ex(Frame.exp (frAccess) (Tree.TEMP(Frame.FP)) )  *)
+                Ex(followStaticLinks(varLevel, level) )
+            end
+	     
 end
