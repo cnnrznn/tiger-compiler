@@ -5,17 +5,21 @@ struct
 
         type frame = {  label: Temp.label,      (* machine code label *)
                         formals: access list,   (* location of variables *)
-                        nextOffset: int ref     (* next stack offset    *)
+                        nextOffset: int ref,    (* next stack offset    *)
+                        parent: int
                         (* other things *)
                         }
+
         val wordSize = 4
-        val FP = Temp.newTemp()
+        val FP = Temp.newtemp()
+
         fun formals(f:frame) = #formals f
 
         fun name(f: frame) = #label f
 
         fun newFrame{name: Temp.label,
-                        formals: bool list}: frame =
+                        formals: bool list,
+                        parent: int}: frame =
                 let val off = ref wordSize
                     fun formals2acc(_, []) = []
                       | formals2acc(off, f :: flist) =
@@ -26,7 +30,8 @@ struct
                          end
                 in { label=name,
                      formals=formals2acc(off, formals),
-                     nextOffset=off }
+                     nextOffset=off,
+                     parent=parent}
                 end
 
         fun allocLocal (f: frame) (esc: bool) =
@@ -38,9 +43,9 @@ struct
                 end
 
         fun exp (acc:access) (e : Tree.exp) = 
-	    case access 
-	     of InFrame off => (Tree.MEM (Tree.BINOP (Tree.PLUS, e, Tree.CONST off)))
-                |InReg reg =>  (Tree.TEMP reg)  
+	    case acc
+	     of InFrame off => Tree.MEM (Tree.BINOP (Tree.PLUS, e, Tree.CONST off))
+              | InReg reg =>  Tree.TEMP reg
 
 end
 
