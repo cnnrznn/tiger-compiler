@@ -27,6 +27,8 @@ sig
         val whileExp: Temp.label * Temp.label *
                         Temp.label *exp * exp
                         -> exp
+        val ifThenElse: exp * exp * exp -> exp
+        val ifThen: exp * exp -> exp
 end
 
 structure Translate : TRANSLATE =
@@ -127,7 +129,7 @@ struct
           | unNx (Nx nx) = nx
 
         and unCx (Ex ex) =
-                (fn (t, f) => T.CJUMP(T.GT, ex, T.CONST 0, t, f))
+                (fn (t, f) => T.CJUMP(T.NE, ex, T.CONST 0, t, f))
           | unCx (Cx genstm) = genstm
           | unCx (Nx nx) = (
                 ErrorMsg.error 0 "Error using no-value statement in conditional";
@@ -202,13 +204,43 @@ struct
                         expBody: exp, expTest: exp) =
                 let
                         val exBod = unNx(expBody)
-                        val exTest = unEx(expTest)
+                        val exTest = unCx(expTest)
                 in
                         Nx(T.SEQ(T.JUMP(T.NAME labTest, [labTest]),
                                  T.SEQ(T.LABEL labBody,
                                  T.SEQ(exBod,
                                  T.SEQ(T.LABEL labTest,
-                                 T.SEQ(T.CJUMP(T.GT, T.CONST 0, exTest, labBody, labDone),
+                                 T.SEQ(exTest(labBody, labDone),
                                         T.LABEL labDone))))))
+                end
+
+        fun ifThenElse(expTest: exp, expThen: exp, expElse: exp) =
+                let val exTest = unCx(expTest)
+                    val exThen = unEx(expThen)
+                    val exElse = unEx(expElse)
+                    val labelThen = Temp.newlabel()
+                    val labelElse = Temp.newlabel()
+                    val labelDone = Temp.newlabel()
+                    val r = Temp.newtemp()
+                in
+                        Ex(T.ESEQ(T.SEQ(exTest(labelThen, labelElse),
+                                  T.SEQ(T.LABEL labelThen,
+                                  T.SEQ(T.MOVE(T.TEMP r, exThen),
+                                  T.SEQ(T.JUMP(T.NAME labelDone, [labelDone]),
+                                  T.SEQ(T.LABEL labelElse,
+                                  T.SEQ(T.MOVE(T.TEMP r, exElse),
+                                  T.SEQ(T.JUMP(T.NAME labelDone, [labelDone]),
+                                        T.LABEL labelDone))))))),
+                                T.TEMP r))
+                end
+        fun ifThen(expTest: exp, expThen: exp) =
+                let val exTest = unCx(expTest)
+                    val exThen = unNx(expThen)
+                    val labelThen = Temp.newlabel()
+                    val labelDone = Temp.newlabel()
+                in
+                        Nx(T.SEQ(exTest(labelThen, labelDone),
+                           T.SEQ(T.LABEL labelThen,
+                           T.SEQ(exThen, T.LABEL labelDone))))
                 end
 end

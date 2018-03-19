@@ -222,25 +222,30 @@ and transAssignExp(tenv, venv, A.AssignExp{var,exp, pos},
 and transIfExp(tenv, venv, A.IfExp{test, then', else', pos},
                         level: Translate.level) =
         let
-                val {exp=_ , ty=tyTest} = transExp(tenv, venv, test, level)
-                val {exp=_ , ty=tyThen} = transExp(tenv, venv, then', level)
+                val {exp=expTest, ty=tyTest} = transExp(tenv, venv, test, level)
+                val {exp=expThen, ty=tyThen} = transExp(tenv, venv, then', level)
         in 
                 if tyTest = T.INT then
                         case else'
                         of SOME e =>
-                                let val {exp=_ , ty=tyElse} = transExp(tenv, venv, e, level)
+                                let val {exp=expElse, ty=tyElse} = transExp(tenv, venv, e, level)
                                 in
                                         if checkSame(tyThen, tyElse) then(
+                                          let val ty=
                                                 case tyThen
                                                   of T.NIL => tyElse
-                                                  | _ => tyThen)
+                                                  | _ => tyThen
+                                          in {exp=Translate.ifThenElse(expTest, expThen, expBody),
+                                                ty=ty}
+                                          end
+                                        )
                                         else (ErrorMsg.error pos "type mismatch";
-                                              T.UNIT)
+                                              {exp=Translate.errorTree(1), ty=T.UNIT})
                                 end
-                        | NONE => T.UNIT
+                        | NONE => {exp=Translate.ifThen(expTest,expThen), ty=T.UNIT}
                 else
                         (ErrorMsg.error pos "Test is not integer value";
-                        T.UNIT)
+                        {exp=Translate.errorTree(1), ty=T.UNIT})
         end
 
 (*******************************************************)
@@ -533,7 +538,7 @@ case exp of
 | A.AssignExp assignexp =>
         {exp=(), ty=actual_ty(transAssignExp(tenv, venv, A.AssignExp assignexp, level))}
 | A.IfExp ifexp =>
-        {exp=(), ty=actual_ty(transIfExp(tenv, venv, A.IfExp ifexp, level))}
+        transIfExp(tenv, venv, A.IfExp ifexp, level)
 | A.WhileExp whilexp =>
         transWhileExp(tenv, venv, A.WhileExp whilexp, level)
 | A.ForExp forexp =>
