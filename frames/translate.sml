@@ -2,7 +2,6 @@ signature TRANSLATE =
 sig
 	type level
 	type access (* not the same as Frame.access *)
-        type exp
 
 	val outermost : level
 	val newLevel : {parent: level, name: Temp.label,
@@ -10,14 +9,30 @@ sig
 	val formals: level -> access list
 	val allocLocal: level -> bool -> access
 
+        val init : unit -> unit
+
+        datatype exp = Ex of Tree.exp
+                     | Nx of Tree.stm
+                     | Cx of Temp.label * Temp.label -> Tree.stm
+
+        val unEx: exp -> Tree.exp
+        val unNx: exp -> Tree.stm
+        val unCx: exp -> Temp.label * Temp.label -> Tree.stm
+
         val simpleVar: access * level -> exp
         val subscriptVar : exp * exp -> exp
         val fieldVar: exp * int -> exp
+
+        val binop: A.oper * exp * exp -> exp
+        val whileExp: Temp.label * Temp.label *
+                        Temp.label *exp * exp
+                        -> exp
 end
 
 structure Translate : TRANSLATE =
 struct
-        type level = {parent : level, frame : Frame.frame, unique : unit ref}
+        (*type level = {parent : level, frame : Frame.frame, unique : unit ref}*)
+        type level = int
         type access = level * Frame.access
 
         datatype exp = Ex of Tree.exp
@@ -35,7 +50,8 @@ struct
         val HT : Frame.frame Table.table ref = ref Table.empty
 
         fun init () =
-                let val frame = Frame.newFrame{name=Temp.newlabel(), formals=[]}
+                let val frame = Frame.newFrame{name=Temp.newlabel(), formals=[],
+                                                parent= ~1}
                     val HT' = Table.enter(!HT, outermost, frame)
                 in HT := HT'
                 end
@@ -43,7 +59,8 @@ struct
 
         fun newLevel{parent=plev, name: Temp.label, formals: bool list} =
                 let val frame = Frame.newFrame{name = name,
-                                                formals = true :: formals}
+                                                formals = true :: formals,
+                                                parent=plev}
                 in nextLevel := !nextLevel + 1;
                    (* create mapping from nextLevel -> frame *)
                    HT := Table.enter(!HT, !nextLevel, frame);
@@ -62,7 +79,8 @@ struct
                                   | NONE => (ErrorMsg.error 0 "should never see this";
                                                 {label=Temp.newlabel(),
                                                  formals=[],
-                                                 nextOffset=ref 4
+                                                 nextOffset=ref 4,
+                                                 parent=outermost
                                                 })
                     val acc = Frame.allocLocal(frame)(esc)
                 in (lev, acc)
@@ -77,52 +95,120 @@ struct
                               end
                   | NONE => (ErrorMsg.error 0 "should never see this";
                                 [])
-        (***********************************************************************)
-        (* This method starts from the current level and follows the static    *)
-        (* links to get to parent level frames until it reaches the declaration*)
-        (* level of the variable. At each level it adds the static link offset *)
-        (* to the frame pointer and finally returns a tree                     *)
 
-        fun followStaticLinks (frAccess:Frame.access, varLevel:level, curLevel: level) =
-           let 
-               val parentLevel = #parent curLevel
-               val frame =  #frame curLevel
-               val sl_access :: formals = Frame.formals(frame)
-                 
-           in
-               if #unique curLevel = #unique varLevel then
-                   Tree.TEMP(Frame.FP)
-               else
-                   Frame.exp (frAccess) followStaticLinks (sl_access ,varLevel, parentLevel)
-           end
-	
+
+        structure T = Tree
+
+        datatype exp = Ex of Tree.exp
+                     | Nx of Tree.stm
+                     | Cx of Temp.label * Temp.label -> Tree.stm
+
+        fun unEx (Ex ex) = ex
+          | unEx (Cx genstm) =
+                let val r = Temp.newtemp()
+                    val t = Temp.newlabel() and f = Temp.newlabel()
+                in T.ESEQ(T.SEQ(T.MOVE(T.TEMP r, T.CONST 1),
+                                T.SEQ(genstm(t,f),
+                                      T.SEQ(T.LABEL f,
+                                            T.SEQ(T.MOVE(T.TEMP r, T.CONST 0),
+                                                  T.LABEL t)
+                                            )
+                                      )
+                                ),
+                                T.TEMP r)
+                end
+          | unEx (Nx nx) = T.ESEQ(nx, T.CONST 0)
+
+        and unNx (Ex ex) = T.EXP(ex)
+          | unNx (Cx genstm) =
+                let val l = Temp.newlabel()
+                in T.SEQ(genstm(l,l), T.LABEL l)
+                end
+          | unNx (Nx nx) = nx
+
+        and unCx (Ex ex) =
+                (fn (t, f) => T.CJUMP(T.GT, ex, T.CONST 0, t, f))
+          | unCx (Cx genstm) = genstm
+          | unCx (Nx nx) = (
+                ErrorMsg.error 0 "Error using no-value statement in conditional";
+                fn (t, f) => T.CJUMP(T.GT, T.CONST 0, T.CONST 1, t, f)
+                )
+
         (*****************************************)
         (* function to translate simple variable *)
      
-	    
-        fun simpleVar(acc : access, lev : level) = 
- 	    let
-		val varLevel = #1 acc
-                val frAccess = #2 acc 
-            in
-                (* following static links implemented*)
-		(*Ex(Frame.exp (frAccess) (Tree.TEMP(Frame.FP)) )  *)
-                Ex(followStaticLinks(varLevel, level) )
-            end
+        fun simpleVarRec(acc: access, alev: int, t: T.exp) =
+                let val dlev = #1 acc
+                    val frAcc = #2 acc
+                in
+                        case Table.look(!HT, dlev)
+                         of NONE => (ErrorMsg.error 0 "could not find frame"; Tree.MEM(T.CONST 0))
+                          | SOME f => if dlev = alev
+                                      then Frame.exp(frAcc)(t)
+                                      else simpleVarRec(acc, #parent f,
+                                                T.MEM(T.BINOP(T.PLUS, T.CONST 0, t)))
+                end
+        fun simpleVar(acc : access, alev: level) =
+                Ex(simpleVarRec(acc, alev, T.TEMP Frame.FP))
         
         (*****************************************)
         (* function to translate array subscript variable *)
-    
-       fun subscriptVar(varExp: Frame.exp, indexExp: Frame.exp) =
+   
+        and subscriptVar(varExp: exp, indExp: exp) =
+                Ex(T.MEM(T.CONST 0))
+
+        and fieldVar(varExp: exp, indExp: int) =
+                Ex(T.MEM(T.CONST 0))
+
+       (*fun subscriptVar(varExp: Frame.exp, indexExp: Frame.exp) =
           (* doubts - should we use UnEx constructor for the xpressions? is it Tree.PLUS or Tree.MINUS ? *)
           EX( Tree.MEM( Tree.BINOP( Tree.PLUS, varExp, Tree.BINOP( Tree.MUL,  indexExp , Tree.CONST (Frame.wordSize) ) )))
 
        
        (*****************************************)
        (* function to translate record field variable *)
-     
+
        fun fieldVar (varExp : Frame.exp, fieldIndex : int) =
-           Ex( Tree.MEM ( Tree.BINOP ( Tree.PLUS, varExp , Tree.CONST(fieldIndex * Frame.wordSize) ) ) )
-           
-	     
+           Ex( Tree.MEM ( Tree.BINOP ( Tree.PLUS, varExp , Tree.CONST(fieldIndex * Frame.wordSize) ) ) )*)
+
+        fun binop(oper: A.oper, expl: exp, expr: exp) =
+                let val exl = unEx(expl)
+                    val exr = unEx(expr)
+                in
+                    case oper
+                     of A.PlusOp =>
+                                Ex(T.BINOP(T.PLUS, exl, exr))
+                      | A.MinusOp =>
+                                Ex(T.BINOP(T.MINUS, exl, exr))
+                      | A.TimesOp =>
+                                Ex(T.BINOP(T.MUL, exl, exr))
+                      | A.DivideOp =>
+                                Ex(T.BINOP(T.DIV, exl, exr))
+                      | A.EqOp =>
+                                Cx(fn(t,f) => T.CJUMP(T.EQ, exl, exr, t, f))
+                      | A.NeqOp =>
+                                Cx(fn(t,f) => T.CJUMP(T.NE, exl, exr, t, f))
+                      | A.LtOp =>
+                                Cx(fn(t,f) => T.CJUMP(T.LT, exl, exr, t, f))
+                      | A.LeOp =>
+                                Cx(fn(t,f) => T.CJUMP(T.LE, exl, exr, t, f))
+                      | A.GtOp =>
+                                Cx(fn(t,f) => T.CJUMP(T.GT, exl, exr, t, f))
+                      | A.GeOp =>
+                                Cx(fn(t,f) => T.CJUMP(T.GE, exl, exr, t, f))
+                end
+
+        fun whileExp(labDone: Temp.label, labBody: Temp.label, labTest: Temp.label,
+                        expBody: exp, expTest: exp) =
+                let
+                        val exBod = unNx(expBody)
+                        val exTest = unEx(expTest)
+                in
+                        Nx(T.SEQ(T.JUMP(T.NAME labTest, [labTest]),
+                                 T.SEQ(T.LABEL labBody,
+                                 T.SEQ(exBod,
+                                 T.SEQ(T.LABEL labTest,
+                                 T.SEQ(T.CJUMP(T.GT, T.CONST 0, exTest, labBody, labDone),
+                                        T.LABEL labDone))))))
+                end
 end
