@@ -1,7 +1,7 @@
 structure Semant =
 struct
 
-type expty = {exp: unit, ty: T.ty}
+type expty = {exp: Translate.exp, ty: T.ty}
 
 datatype envent = VarEnt of { access: Translate.access,
                               ty: T.ty }
@@ -108,8 +108,8 @@ fun checkIntsStrsRecsArrs(T.INT, T.INT, _) =
 fun transOpExp(tenv, venv, A.OpExp{left, oper, right, pos},
                         level: Translate.level) =
         let
-                val {exp=_, ty=tyLeft} = transExp(tenv, venv, left, level)
-                val {exp=_, ty=tyRight} = transExp(tenv, venv, right, level)
+                val {exp=expl, ty=tyLeft} = transExp(tenv, venv, left, level)
+                val {exp=expr, ty=tyRight} = transExp(tenv, venv, right, level)
                 (* val atl = actual_ty tyLeft
                 val atr = actual_ty tyRight *)
         in
@@ -123,7 +123,8 @@ fun transOpExp(tenv, venv, A.OpExp{left, oper, right, pos},
 
             | (A.PlusOp | A.MinusOp | A.TimesOp | A.DivideOp) => (
                 checkInts(tyLeft, tyRight, pos)
-                )
+                );
+        {exp=Translate.binop(oper, expl, expr), ty=T.INT}
         end
 
 (*******************************************************)
@@ -247,19 +248,24 @@ and transIfExp(tenv, venv, A.IfExp{test, then', else', pos},
 and transWhileExp(tenv, venv, A.WhileExp {test, body, pos},
                         level: Translate.level) =
 	let
-		val {exp=_ , ty=tyTest} = transExp(tenv, venv, test, level)
+		val {exp=expTest, ty=tyTest} = transExp(tenv, venv, test, level)
 	in loopLevel := !loopLevel + 1;
 		let
-			val {exp=_ , ty=tyBody} = transExp(tenv, venv, body, level)
+                        val labDone = Temp.newlabel()
+                        val labBody = Temp.newlabel()
+                        val labTest = Temp.newlabel()
+			val {exp=expBody , ty=tyBody} = transExp(tenv, venv, body, level)
 		in
-        loopLevel := !loopLevel - 1;
-		case (tyTest, tyBody)
-			of (T.INT,T.UNIT) => (T.UNIT)
-			| (T.INT,_)		 =>(ErrorMsg.error pos "Body must produce no value";
-								T.UNIT)
-			| (_, T.UNIT)		 => (ErrorMsg.error pos "Test is not integer value";
-						T.UNIT)
-		end
+                        loopLevel := !loopLevel - 1;
+                        case (tyTest, tyBody)
+                                of (T.INT,T.UNIT) => (T.UNIT)
+                                | (T.INT,_)		 =>(ErrorMsg.error pos "Body must produce no value";
+                                                                        T.UNIT)
+                                | (_, T.UNIT)		 => (ErrorMsg.error pos "Test is not integer value";
+                                                        T.UNIT)
+                        end;
+                        {exp=Translate.whileExp(labDone, labBody, labTest, expBody, expTest),
+                        ty=T.UNIT}
 	end
 
 (*******************************************************)
@@ -510,8 +516,7 @@ and transDecs(tenv, venv, A.VarDec dec::decs, level: Translate.level) =
 and transExp(tenv, venv, exp, level: Translate.level) =
 case exp of
   A.OpExp opexp =>
-        (transOpExp(tenv, venv, A.OpExp opexp, level);
-        {exp=(), ty=T.INT})
+        transOpExp(tenv, venv, A.OpExp opexp, level)
 | A.VarExp var => transVarExp(tenv, venv, var, level)
 | A.NilExp =>
         {exp=(), ty=T.NIL}
@@ -530,7 +535,7 @@ case exp of
 | A.IfExp ifexp =>
         {exp=(), ty=actual_ty(transIfExp(tenv, venv, A.IfExp ifexp, level))}
 | A.WhileExp whilexp =>
-        {exp=(), ty=actual_ty(transWhileExp(tenv, venv, A.WhileExp whilexp, level))}
+        transWhileExp(tenv, venv, A.WhileExp whilexp, level)
 | A.ForExp forexp =>
         {exp=(), ty=actual_ty(transForExp(tenv, venv, A.ForExp forexp, level))}
 | A.BreakExp breakexp =>
