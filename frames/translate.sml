@@ -107,7 +107,7 @@ struct
             in
                 (* following static links implemented*)
 		(*Ex(Frame.exp (frAccess) (Tree.TEMP(Frame.FP)) )  *)
-                Ex(followStaticLinks(varLevel, level) )
+                Ex(followStaticLinks(frAccess, varLevel, level) )
             end
         
         (*****************************************)
