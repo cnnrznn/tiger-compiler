@@ -128,67 +128,75 @@ fun transOpExp(tenv, venv, A.OpExp{left, oper, right, pos},
         end
 
 (*******************************************************)
-and checkFunctionArgs(tenv, venv,(tyFormal::restFormal), res, (exp::restActual), pos,
+and checkFunctionArgs(tenv, venv,(tyFormal::restFormal), res, (exp::restActual), argList, pos,
                         level: Translate.level) =
 	(let
-		val {exp=_ , ty = tyExp} = transExp(tenv, venv, exp, level)
+		val {exp= argExp , ty = tyExp} = transExp(tenv, venv, exp, level)
 	 in
 		if checkDecType(actual_ty tyFormal, tyExp) then
-			checkFunctionArgs(tenv, venv,restFormal, res, restActual, pos, level)
+			checkFunctionArgs(tenv, venv,restFormal, res, restActual, argList::argExp, pos, level)
 		else
 			(ErrorMsg.error pos ("Type Mismatch in args");
-                        false)	
+                        {argExps =[] , tychk =false})	
 	 end
 	)
- | checkFunctionArgs(tenv, venv,[], res, [], pos, _) = true
- | checkFunctionArgs(tenv, venv,_,res,_, pos, _) =(ErrorMsg.error pos ("Incomplete arguments in the function call"); false)
+ | checkFunctionArgs(tenv, venv,[], res, [], argList, pos, _) = {argExps = argList , tychk =true}
+ | checkFunctionArgs(tenv, venv,_,res,_, _, pos, _) =(ErrorMsg.error pos ("Incomplete arguments in the function call"); {argExps =[] , tychk =false})
 
 and transCallExp(tenv, venv, A.CallExp {func,args, pos},
                         level: Translate.level) =
 	(case S.look(venv,func)
-		of SOME (FunEnt{level=_, label=_, params=params, res=res}) =>
-			if checkFunctionArgs(tenv, venv, params, res, args, pos, level) then
-				res
-			else (T.INT)		 
+		of SOME (FunEnt{level=funLevel, label=funLabel, params=params, res=res}) =>
+                       let
+                          val {argExps =argExps , tychk = tychk} = checkFunctionArgs(tenv, venv, params, res, args,[], pos, level)
+                       in
+                           if tychk then
+                               {exp = Translate.callExp(funLevel, level,funLabel, argExps), ty = res}
+			   else ({exp = (), ty = T.INT})
+                       end		 
 		| _ => (ErrorMsg.error pos ("undeclared function " ^ S.name func);
-                        T.INT)
+                        {exp = (), ty = T.INT})
 	)
 (********************************************************)
 (* FUnction to check if the record creation is legal by *)
 (* walking through the record fields and matching the   *)
 (* names and and types.                                 *) 
 
-and checkRecordFields(tenv,venv,T.RECORD((id1, tyRec)::rest, u), ((id2,expRec,posF)::restFields), pos,
+and checkRecordFields(tenv,venv,T.RECORD((id1, tyRec)::rest, u), ((id2,expRec,posF)::restFields), pos, fields,
                         level: Translate.level) =
 	(let
-		val {exp=_ , ty = tyExp} = transExp(tenv, venv, expRec, level)
+		val {exp= e , ty = tyExp} = transExp(tenv, venv, expRec, level)
 	in
 		if id1 = id2 then 
 			if checkDecType(actual_ty tyRec, actual_ty tyExp) then
-				checkRecordFields(tenv, venv, T.RECORD(rest, u), restFields, pos, level)
+				checkRecordFields(tenv, venv, T.RECORD(rest, u), restFields, pos, fields::e, level)
 			else
 				(ErrorMsg.error posF ("type mismatch in record field " ^ S.name id1);
-				false)
+				 {fieldList = [], tychk = false})
 		else (ErrorMsg.error posF ("field names incorrect" ^ S.name id1);
-                false)
+                {fieldList = [], tychk = false})
 	end)
-  | checkRecordFields(tenv, venv, T.RECORD([], u), [], pos, _) = true
-  | checkRecordFields(tenv,venv, _ , _ , pos, _) =(ErrorMsg.error pos ("mismatched field names");
-								 false)
+  | checkRecordFields(tenv, venv, T.RECORD([], u), [], pos,fields, _) = {fieldList = fields ,tychk = true}
+  | checkRecordFields(tenv,venv, _ , _ , pos,fields, _) =(ErrorMsg.error pos ("mismatched field names");
+								 {fieldList = [], tychk = false})
 and transRecordExp(tenv, venv, A.RecordExp{fields,typ, pos},
                         level: Translate.level) =
 	(case S.look(tenv,typ)
 		of SOME ty => (
                         let val recty = actual_ty ty
 			in
-                                if checkRecordFields(tenv, venv, recty, fields, pos, level) then
-                                        recty
+                          let
+                             val {fieldList = fieldList, tychk = tychk }= checkRecordFields(tenv, venv, recty, fields,  pos, [], level) 
+                          in
+                          end
+                                if tychk then
+                                        {exp = Translate.recordExp(fieldList), ty = recty})
                                 else
-                                        (T.INT)
+                                        ({exp = (), ty = T.INT})
                         end
 		)
 		| _ =>  (ErrorMsg.error pos ("undefined type " ^ S.name typ);
-                        T.INT)
+                        {exp = (), ty = T.INT})
 	)
 
 (*******************************************************)
@@ -316,21 +324,22 @@ and transArrayExp(tenv, venv, A.ArrayExp {typ,size,init,pos},
                 let
                         val arrty = actual_ty ty
                         val T.ARRAY(itemty, _) = arrty
-                        val {exp=_ , ty=tySize} = transExp(tenv, venv, size, level)
-                        val {exp=_ , ty=tyInit} = transExp(tenv, venv, init, level)
+                        val {exp= sizeExp , ty=tySize} = transExp(tenv, venv, size, level)
+                        val {exp= initExp , ty=tyInit} = transExp(tenv, venv, init, level)
                 in
-                        if tySize = T.INT then
+                        if actual_ty(tySize) = T.INT then
                                 if checkDecType(itemty, tyInit) then
-                                        arrty
-                                else (  ErrorMsg.error pos ("type mismatch " ^ S.name typ) ;T.INT)
+                                        {exp = Translate.arrayExp(sizeExp, initExp) ,ty = arrty}
+                                else (  ErrorMsg.error pos ("type mismatch " ^ S.name typ) ;
+					{exp = (), ty = T.INT})
                         else
-                                (ErrorMsg.error pos ("Array Size must be an Integer ");T.INT)
+                                (ErrorMsg.error pos ("Array Size must be an Integer ");
+				{exp = (), ty = T.INT})
                 end
                 )
         | _ => (ErrorMsg.error pos ("undefined type " ^ S.name typ);
-        T.INT)
+               {exp = (), ty = T.INT})
         )
-
 (*******************************************************)
 
 and transVarExp(tenv, venv, A.SimpleVar(id,pos),
@@ -529,10 +538,8 @@ case exp of
         {exp=(), ty=T.INT}
 | A.StringExp(str, p) =>
         {exp=(), ty=T.STRING}
-| A.CallExp callexp =>
-        {exp=(), ty=actual_ty(transCallExp(tenv, venv, A.CallExp callexp, level))}
-| A.RecordExp recexp =>
-        {exp=(), ty=actual_ty(transRecordExp(tenv, venv, A.RecordExp recexp, level))}
+| A.CallExp callexp => transCallExp(tenv, venv, A.CallExp callexp, level)
+| A.RecordExp recexp => transRecordExp(tenv, venv, A.RecordExp recexp, level)
 | A.SeqExp seqexp =>
         {exp=(), ty=actual_ty(transSeqExp(tenv, venv, A.SeqExp seqexp, level))}
 | A.AssignExp assignexp =>
@@ -550,8 +557,7 @@ case exp of
                         transDecs(tenv, venv, decs, level)
         in transExp(tenv', venv', body, level)
         end
-| A.ArrayExp arrexp =>
-        {exp=(), ty=actual_ty(transArrayExp(tenv, venv, A.ArrayExp arrexp, level))}
+| A.ArrayExp arrexp => transArrayExp(tenv, venv, A.ArrayExp arrexp, level)
 
 (*******************************************************)
 

@@ -46,6 +46,9 @@ struct
 	    case acc
 	     of InFrame off => Tree.MEM (Tree.BINOP (Tree.PLUS, e, Tree.CONST off))
               | InReg reg =>  Tree.TEMP reg
+    
+        fun externalCall (s, args) =
+            Tree.CALL(Tree.NAME(Temp.namedlabel s), args)
 
 end
 

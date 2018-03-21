@@ -29,6 +29,10 @@ sig
                         -> exp
         val ifThenElse: exp * exp * exp -> exp
         val ifThen: exp * exp -> exp
+
+        val recordExp: exp list -> exp
+        val arrayExp : exp * exp -> exp
+        val callExp: level * level * Temp.label * exp list -> exp
 end
 
 structure Translate : TRANSLATE =
@@ -243,4 +247,35 @@ struct
                            T.SEQ(T.LABEL labelThen,
                            T.SEQ(exThen, T.LABEL labelDone))))
                 end
+
+       fun recursiveTrees(e::restList, r, index)=
+           T.SEQ(T.MOVE(T.MEM(T.BINOP(T.PLUS,T.TEMP r, T.CONST(index * Frame.wordSize))), unEx e) , recursiveTrees(restList, r, index+1) )
+       | recursiveTrees([], r, index) = Tree.stm  (* basically a dummy return statement *)
+        
+
+
+       fun recordExp(fieldList) = 
+           let
+               val r = Temp.newtemp()
+                
+           in
+             EX(T.ESEQ(T.SEQ(T.MOVE(Temp r, Frame.externalCall("initRecord", [T.CONST(Frame.wordSize * length fieldList  )] ) ) ,
+		 recursiveTrees (fieldList , r, 0)), 
+                T.TEMP r) 
+               )
+           end
+
+       fun arrayExp(sizeExp, initExp)=
+           let
+               val r = Temp.newtemp()
+           in
+               Ex( T.ESEQ( T.MOVE( T.TEMP r, Frame.externalCall ("initArray", [ unEx sizeExp, unEx initExp ])), T.TEMP r))
+           end	
+       
+       fun callExp(funLevel, curLevel, funLabel, argexps)=
+           EX(T.CALL(T.NAME funLabel, ))   
+    
+
+
+
 end
