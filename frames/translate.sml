@@ -154,6 +154,7 @@ struct
                                       else simpleVarRec(acc, #parent f,
                                                 T.MEM(T.BINOP(T.PLUS, T.CONST 0, t)))
                 end
+
         fun simpleVar(acc : access, alev: level) =
                 Ex(simpleVarRec(acc, alev, T.TEMP Frame.FP))
         
@@ -166,16 +167,16 @@ struct
         and fieldVar(varExp: exp, indExp: int) =
                 Ex(T.MEM(T.CONST 0))
 
-       (*fun subscriptVar(varExp: Frame.exp, indexExp: Frame.exp) =
+       fun subscriptVar(varExp: Frame.exp, indexExp: Frame.exp) =
           (* doubts - should we use UnEx constructor for the xpressions? is it Tree.PLUS or Tree.MINUS ? *)
-          EX( Tree.MEM( Tree.BINOP( Tree.PLUS, varExp, Tree.BINOP( Tree.MUL,  indexExp , Tree.CONST (Frame.wordSize) ) )))
+          EX( Tree.MEM( Tree.BINOP( Tree.PLUS, unEx varExp, Tree.BINOP( Tree.MUL,  unEx indexExp , Tree.CONST (Frame.wordSize) ) )))
 
        
        (*****************************************)
        (* function to translate record field variable *)
 
        fun fieldVar (varExp : Frame.exp, fieldIndex : int) =
-           Ex( Tree.MEM ( Tree.BINOP ( Tree.PLUS, varExp , Tree.CONST(fieldIndex * Frame.wordSize) ) ) )*)
+           Ex( Tree.MEM ( Tree.BINOP ( Tree.PLUS, unEx varExp , Tree.CONST(fieldIndex * Frame.wordSize) ) ) )
 
         fun binop(oper: A.oper, expl: exp, expr: exp) =
                 let val exl = unEx(expl)
@@ -253,7 +254,6 @@ struct
        | recursiveTrees([], r, index) = Tree.stm  (* basically a dummy return statement *)
         
 
-
        fun recordExp(fieldList) = 
            let
                val r = Temp.newtemp()
@@ -272,9 +272,23 @@ struct
                Ex( T.ESEQ( T.MOVE( T.TEMP r, Frame.externalCall ("initArray", [ unEx sizeExp, unEx initExp ])), T.TEMP r))
            end	
        
-       fun callExp(funLevel, curLevel, funLabel, argexps)=
-           EX(T.CALL(T.NAME funLabel, ))   
-    
+
+       fun callExpRec(callerLev: int, funLev : int, t ) =
+             case Table.look(!HT, callerLev)
+                  of NONE => (ErrorMsg.error 0 "could not find frame"; Tree.MEM(T.CONST 0))
+                   | SOME f => 
+                         if funLev = callerLev
+                              
+                         then (* return the static link of the function *)
+                         else callExpRec(#parent f, funLev
+                                                T.MEM(T.BINOP(T.PLUS, T.CONST 0, t)))
+
+       fun callExp(funLevel, callerLevel, funLabel, argexps) =
+           let 
+               val staticlink = callExpRec(callerLevel, funLevel, T.TEMP Frame.FP)
+           in
+               EX(T.CALL(T.NAME funLabel, staticlink:: List.map unEx argexps ))   
+           end
 
 
 

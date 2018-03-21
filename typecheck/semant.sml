@@ -151,7 +151,7 @@ and transCallExp(tenv, venv, A.CallExp {func,args, pos},
                           val {argExps =argExps , tychk = tychk} = checkFunctionArgs(tenv, venv, params, res, args,[], pos, level)
                        in
                            if tychk then
-                               {exp = Translate.callExp(funLevel, level,funLabel, argExps), ty = res}
+                               {exp = Translate.callExp(funLevel, level, funLabel, argExps), ty = res}
 			   else ({exp = (), ty = T.INT})
                        end		 
 		| _ => (ErrorMsg.error pos ("undeclared function " ^ S.name func);
