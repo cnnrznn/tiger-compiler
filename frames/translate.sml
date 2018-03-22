@@ -19,6 +19,10 @@ sig
         val unNx: exp -> Tree.stm
         val unCx: exp -> Temp.label * Temp.label -> Tree.stm
 
+        val procEntryExit: {level: level, body: exp} -> unit
+
+        val getResult: unit -> Frame.frag list
+
         val simpleVar: access * level -> exp
         val subscriptVar : exp * exp -> exp
         val fieldVar: exp * int -> exp
@@ -33,6 +37,13 @@ sig
         val recordExp: exp list -> exp
         val arrayExp : exp * exp -> exp
         val callExp: level * level * Temp.label * exp list -> exp
+        val strExp: string -> exp
+        val assignment: access * exp * level -> exp
+        val break: Temp.label option -> exp
+
+        val prepend: exp list * exp -> exp
+
+        val errorTree: int -> exp
 end
 
 structure Translate : TRANSLATE =
@@ -47,6 +58,8 @@ struct
 
         val outermost = 0
         val nextLevel = ref 0
+
+        val fragList: Frame.frag list ref = ref []
 
         (********************************************************)
         (* A comment should explain this block of code.         *)
@@ -140,6 +153,27 @@ struct
                 fn (t, f) => T.CJUMP(T.GT, T.CONST 0, T.CONST 1, t, f)
                 )
 
+        (************************************************)
+        (* HELPER FUNCTIONS                             *)
+
+        fun prepend(explist: exp list, exp: exp) =
+                let val ex = unEx(exp)
+                    fun explist2stm(exp :: []) = unNx(exp)
+                      | explist2stm(exp :: rest) =
+                          let val nx = unNx(exp)
+                          in  T.SEQ(nx, explist2stm(rest))
+                          end
+                    val stm = explist2stm(explist)
+                in Ex(T.ESEQ(stm, ex))
+                end
+
+        fun errorTree(n: int) = Ex(T.MEM(T.CONST n))
+
+        fun procEntryExit{level: level, body: exp} =
+                ()
+
+        fun getResult() = !fragList
+
         (*****************************************)
         (* function to translate simple variable *)
      
@@ -151,31 +185,16 @@ struct
                          of NONE => (ErrorMsg.error 0 "could not find frame"; Tree.MEM(T.CONST 0))
                           | SOME f => if dlev = alev
                                       then Frame.exp(frAcc)(t)
-                                      else simpleVarRec(acc, #parent f,
-                                                T.MEM(T.BINOP(T.PLUS, T.CONST 0, t)))
+                                      else simpleVarRec(acc, #parent f, T.MEM(t))
                 end
 
         fun simpleVar(acc : access, alev: level) =
                 Ex(simpleVarRec(acc, alev, T.TEMP Frame.FP))
         
-        (*****************************************)
-        (* function to translate array subscript variable *)
-   
-        and subscriptVar(varExp: exp, indExp: exp) =
-                Ex(T.MEM(T.CONST 0))
+       fun subscriptVar(varExp: exp, indexExp: exp) =
+          Ex( Tree.MEM( Tree.BINOP( Tree.PLUS, unEx varExp, Tree.BINOP( Tree.MUL,  unEx indexExp , Tree.CONST (Frame.wordSize) ) )))
 
-        and fieldVar(varExp: exp, indExp: int) =
-                Ex(T.MEM(T.CONST 0))
-
-       fun subscriptVar(varExp: Frame.exp, indexExp: Frame.exp) =
-          (* doubts - should we use UnEx constructor for the xpressions? is it Tree.PLUS or Tree.MINUS ? *)
-          EX( Tree.MEM( Tree.BINOP( Tree.PLUS, unEx varExp, Tree.BINOP( Tree.MUL,  unEx indexExp , Tree.CONST (Frame.wordSize) ) )))
-
-       
-       (*****************************************)
-       (* function to translate record field variable *)
-
-       fun fieldVar (varExp : Frame.exp, fieldIndex : int) =
+       fun fieldVar (varExp : exp, fieldIndex : int) =
            Ex( Tree.MEM ( Tree.BINOP ( Tree.PLUS, unEx varExp , Tree.CONST(fieldIndex * Frame.wordSize) ) ) )
 
         fun binop(oper: A.oper, expl: exp, expr: exp) =
@@ -249,47 +268,55 @@ struct
                            T.SEQ(exThen, T.LABEL labelDone))))
                 end
 
-       fun recursiveTrees(e::restList, r, index)=
-           T.SEQ(T.MOVE(T.MEM(T.BINOP(T.PLUS,T.TEMP r, T.CONST(index * Frame.wordSize))), unEx e) , recursiveTrees(restList, r, index+1) )
-       | recursiveTrees([], r, index) = Tree.stm  (* basically a dummy return statement *)
+        fun recursiveRecord(e::[], r, index) =
+                T.MOVE(T.MEM(T.BINOP(T.PLUS,T.TEMP r, T.CONST(index * Frame.wordSize))), unEx e)
+          | recursiveRecord(e::restList, r, index) =
+                T.SEQ(T.MOVE(T.MEM(T.BINOP(T.PLUS,T.TEMP r, T.CONST(index * Frame.wordSize))), unEx e) , recursiveRecord(restList, r, index+1))
+          | recursiveRecord(_, _, _) =
+                T.EXP(T.MEM(T.CONST 0)) (* this is a real error condition *)
+
+       (*| recursiveTrees([], r, index) = T.MEM(T.CONST 0) *) (* Oh so I guess inserting seg faults is normal compiler behavior? *)
         
 
        fun recordExp(fieldList) = 
-           let
-               val r = Temp.newtemp()
-                
-           in
-             EX(T.ESEQ(T.SEQ(T.MOVE(Temp r, Frame.externalCall("initRecord", [T.CONST(Frame.wordSize * length fieldList  )] ) ) ,
-		 recursiveTrees (fieldList , r, 0)), 
-                T.TEMP r) 
-               )
+           let val r = Temp.newtemp()
+           in  Ex(T.ESEQ(
+                        T.SEQ(T.MOVE(T.TEMP r, Frame.externalCall("initRecord", [T.CONST(Frame.wordSize * length fieldList  )])),
+                              recursiveRecord(fieldList , r, 0)),
+                        T.TEMP r))
            end
 
        fun arrayExp(sizeExp, initExp)=
-           let
-               val r = Temp.newtemp()
-           in
-               Ex( T.ESEQ( T.MOVE( T.TEMP r, Frame.externalCall ("initArray", [ unEx sizeExp, unEx initExp ])), T.TEMP r))
-           end	
-       
-
-       fun callExpRec(callerLev: int, funLev : int, t ) =
-             case Table.look(!HT, callerLev)
-                  of NONE => (ErrorMsg.error 0 "could not find frame"; Tree.MEM(T.CONST 0))
-                   | SOME f => 
-                         if funLev = callerLev
-                              
-                         then (* return the static link of the function *)
-                         else callExpRec(#parent f, funLev
-                                                T.MEM(T.BINOP(T.PLUS, T.CONST 0, t)))
-
-       fun callExp(funLevel, callerLevel, funLabel, argexps) =
-           let 
-               val staticlink = callExpRec(callerLevel, funLevel, T.TEMP Frame.FP)
-           in
-               EX(T.CALL(T.NAME funLabel, staticlink:: List.map unEx argexps ))   
+           let val r = Temp.newtemp()
+           in Ex( T.ESEQ( T.MOVE( T.TEMP r, Frame.externalCall ("initArray", [ unEx sizeExp, unEx initExp ])), T.TEMP r))
            end
 
+       fun callExpRec(callerLev: int, funLev : int, t ) =
+             case (Table.look(!HT, callerLev), Table.look(!HT, funLev))
+              of (SOME callerFrame, SOME targetFrame) =>
+                        if #parent callerFrame = #parent targetFrame
+                        then T.MEM(t)
+                        else callExpRec(#parent callerFrame, funLev, T.MEM(t))
+               | (_, _) => (ErrorMsg.error 0 "could not find frame"; T.MEM(T.CONST 0))
 
+       fun callExp(funLevel, callerLevel, funLabel, argexps) =
+           let val staticlink = callExpRec(callerLevel, funLevel, T.TEMP Frame.FP)
+           in  Ex(T.CALL(T.NAME funLabel, staticlink:: List.map unEx argexps))
+           end
 
+        fun strExp(str: string) =
+                let val label = Temp.newlabel()
+                in  fragList := Frame.STRING(label, str) :: !fragList;
+                    Ex(Tree.NAME label)
+                end
+
+        fun assignment(acc: access, expInit: exp, lev: level) =
+                let val ex = unEx(expInit)
+                in  Nx(T.MOVE(unEx(simpleVar(acc, lev)), ex))
+                end
+
+        fun break(label: Temp.label option) =
+                case label
+                 of NONE => errorTree(6)
+                  | SOME l => Nx(T.JUMP(T.NAME l, [l]))
 end
