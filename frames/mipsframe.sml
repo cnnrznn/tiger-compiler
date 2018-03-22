@@ -10,8 +10,12 @@ struct
                         (* other things *)
                         }
 
+        datatype frag = PROC of {body: Tree.stm, frame: frame}
+                      | STRING of Temp.label * string
+
         val wordSize = 4
         val FP = Temp.newtemp()
+        val RV = Temp.newtemp()
 
         fun formals(f:frame) = #formals f
 
@@ -49,6 +53,8 @@ struct
     
         fun externalCall (s, args) =
             Tree.CALL(Tree.NAME(Temp.namedlabel s), args)
+
+        fun procEntryExit1(frame: frame, body: Tree.stm) = body
 
 end
 
