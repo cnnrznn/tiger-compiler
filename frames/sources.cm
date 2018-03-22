@@ -14,6 +14,7 @@ Group is
 ../typecheck/types.sml
 ../typecheck/semant.sml
 
+printtree.sml
 tree.sml
 
 temp.sig

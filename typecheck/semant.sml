@@ -106,10 +106,10 @@ fun checkIntsStrsRecsArrs(T.INT, T.INT, _) =
 (*******************************************************)
 
 fun transOpExp(tenv, venv, A.OpExp{left, oper, right, pos},
-                        level: Translate.level) =
+                        level: Translate.level, doneLabel) =
         let
-                val {exp=expl, ty=tyLeft} = transExp(tenv, venv, left, level)
-                val {exp=expr, ty=tyRight} = transExp(tenv, venv, right, level)
+                val {exp=expl, ty=tyLeft} = transExp(tenv, venv, left, level, doneLabel)
+                val {exp=expr, ty=tyRight} = transExp(tenv, venv, right, level, doneLabel)
                 (* val atl = actual_ty tyLeft
                 val atr = actual_ty tyRight *)
         in
@@ -129,33 +129,33 @@ fun transOpExp(tenv, venv, A.OpExp{left, oper, right, pos},
 
 (*******************************************************)
 and checkFunctionArgs(tenv, venv,(tyFormal::restFormal), res, (exp::restActual), argList, pos,
-                        level: Translate.level) =
+                        level: Translate.level, doneLabel) =
 	(let
-		val {exp= argExp , ty = tyExp} = transExp(tenv, venv, exp, level)
+		val {exp= argExp , ty = tyExp} = transExp(tenv, venv, exp, level, doneLabel)
 	 in
 		if checkDecType(actual_ty tyFormal, tyExp) then
-			checkFunctionArgs(tenv, venv,restFormal, res, restActual, argList::argExp, pos, level)
+			checkFunctionArgs(tenv, venv,restFormal, res, restActual, argExp::argList, pos, level, doneLabel)
 		else
 			(ErrorMsg.error pos ("Type Mismatch in args");
                         {argExps =[] , tychk =false})	
 	 end
 	)
- | checkFunctionArgs(tenv, venv,[], res, [], argList, pos, _) = {argExps = argList , tychk =true}
- | checkFunctionArgs(tenv, venv,_,res,_, _, pos, _) =(ErrorMsg.error pos ("Incomplete arguments in the function call"); {argExps =[] , tychk =false})
+ | checkFunctionArgs(tenv, venv,[], res, [], argList, pos, _, _) = {argExps = argList , tychk =true}
+ | checkFunctionArgs(tenv, venv,_,res,_, _, pos, _, _) =(ErrorMsg.error pos ("Incomplete arguments in the function call"); {argExps =[] , tychk =false})
 
 and transCallExp(tenv, venv, A.CallExp {func,args, pos},
-                        level: Translate.level) =
+                        level: Translate.level, doneLabel) =
 	(case S.look(venv,func)
 		of SOME (FunEnt{level=funLevel, label=funLabel, params=params, res=res}) =>
                        let
-                          val {argExps =argExps , tychk = tychk} = checkFunctionArgs(tenv, venv, params, res, args,[], pos, level)
+                          val {argExps =argExps , tychk = tychk} = checkFunctionArgs(tenv, venv, params, res, args,[], pos, level, doneLabel)
                        in
                            if tychk then
-                               {exp = Translate.callExp(funLevel, level, funLabel, argExps), ty = res}
-			   else ({exp = (), ty = T.INT})
+                               {exp=Translate.callExp(funLevel, level, funLabel, argExps), ty=res}
+			   else ({exp=Translate.errorTree(3), ty = T.INT})
                        end		 
 		| _ => (ErrorMsg.error pos ("undeclared function " ^ S.name func);
-                        {exp = (), ty = T.INT})
+                        {exp=Translate.errorTree(3), ty=T.INT})
 	)
 (********************************************************)
 (* FUnction to check if the record creation is legal by *)
@@ -163,87 +163,86 @@ and transCallExp(tenv, venv, A.CallExp {func,args, pos},
 (* names and and types.                                 *) 
 
 and checkRecordFields(tenv,venv,T.RECORD((id1, tyRec)::rest, u), ((id2,expRec,posF)::restFields), pos, fields,
-                        level: Translate.level) =
-	(let
-		val {exp= e , ty = tyExp} = transExp(tenv, venv, expRec, level)
+                        level: Translate.level, doneLabel) =
+	let
+		val {exp=e , ty=tyExp} = transExp(tenv, venv, expRec, level, doneLabel)
 	in
-		if id1 = id2 then 
+		if id1 = id2 then
 			if checkDecType(actual_ty tyRec, actual_ty tyExp) then
-				checkRecordFields(tenv, venv, T.RECORD(rest, u), restFields, pos, fields::e, level)
+				checkRecordFields(tenv, venv, T.RECORD(rest, u), restFields, pos, e::fields, level, doneLabel)
 			else
 				(ErrorMsg.error posF ("type mismatch in record field " ^ S.name id1);
 				 {fieldList = [], tychk = false})
 		else (ErrorMsg.error posF ("field names incorrect" ^ S.name id1);
                 {fieldList = [], tychk = false})
-	end)
-  | checkRecordFields(tenv, venv, T.RECORD([], u), [], pos,fields, _) = {fieldList = fields ,tychk = true}
-  | checkRecordFields(tenv,venv, _ , _ , pos,fields, _) =(ErrorMsg.error pos ("mismatched field names");
+	end
+  | checkRecordFields(tenv, venv, T.RECORD([], u), [], pos,fields, _, _) = {fieldList=fields, tychk=true}
+  | checkRecordFields(tenv,venv, _ , _ , pos,fields, _, _) = (ErrorMsg.error pos ("mismatched field names");
 								 {fieldList = [], tychk = false})
 and transRecordExp(tenv, venv, A.RecordExp{fields,typ, pos},
-                        level: Translate.level) =
-	(case S.look(tenv,typ)
+                        level: Translate.level, doneLabel) =
+	case S.look(tenv,typ)
 		of SOME ty => (
                         let val recty = actual_ty ty
-			in
-                          let
-                             val {fieldList = fieldList, tychk = tychk }= checkRecordFields(tenv, venv, recty, fields,  pos, [], level) 
-                          in
-                          end
+                            val {fieldList=fieldList, tychk=tychk} =
+                                        checkRecordFields(tenv, venv, recty, fields,  pos, [], level, doneLabel)
+                        in
                                 if tychk then
-                                        {exp = Translate.recordExp(fieldList), ty = recty})
+                                        {exp=Translate.recordExp(fieldList), ty = recty}
                                 else
-                                        ({exp = (), ty = T.INT})
+                                        {exp=Translate.errorTree(0), ty = T.INT}
                         end
 		)
 		| _ =>  (ErrorMsg.error pos ("undefined type " ^ S.name typ);
-                        {exp = (), ty = T.INT})
-	)
+                        {exp=Translate.errorTree(5), ty=T.INT})
 
 (*******************************************************)
 
 and transSeqExp(tenv, venv, A.SeqExp ((exp, pos)::(onemore::rest)),
-                        level: Translate.level) =
-        (transExp(tenv, venv, exp, level);
-        transSeqExp(tenv, venv, A.SeqExp(onemore::rest), level))
+                        level: Translate.level, doneLabel, expList) =
+        let val {exp=expOne, ty=_} = transExp(tenv, venv, exp, level, doneLabel)
+        in transSeqExp(tenv, venv, A.SeqExp(onemore::rest), level, doneLabel, expList @ [expOne])
+        end
   | transSeqExp(tenv, venv, A.SeqExp ((exp, pos)::[]),
-                        level: Translate.level) =
-        let val {exp=_, ty=tyexp} = transExp(tenv, venv, exp, level)
-        in tyexp
+                        level: Translate.level, doneLabel, expList) =
+        let val {exp=expOne, ty=tyexp} = transExp(tenv, venv, exp, level, doneLabel)
+        in {exp=Translate.seqExp(expList, expOne), ty=tyexp}
         end
 	
 (*******************************************************)
 
 and transAssignExp(tenv, venv, A.AssignExp{var,exp, pos},
-                        level: Translate.level) =
+                        level: Translate.level, doneLabel) =
 	let 
-		val tyVar = transVarExp(tenv, venv, var, level)
-		val {exp=_ , ty=tyExp} = transExp(tenv, venv, exp, level)
+		val {exp=expVar, ty=tyVar} = transVarExp(tenv, venv, var, level, doneLabel)
+		val {exp=expInit, ty=tyExp} = transExp(tenv, venv, exp, level, doneLabel)
 	in
 		if checkDecType(tyVar, tyExp) then
-                                T.UNIT
+                                ()
 		else (  ErrorMsg.error pos "type mismatch";
-                                T.UNIT)
+                                ());
+                {exp=Translate.assignExp(expVar, expInit), ty=T.UNIT}
 	end
 
 (*******************************************************)
 
 and transIfExp(tenv, venv, A.IfExp{test, then', else', pos},
-                        level: Translate.level) =
+                        level: Translate.level, doneLabel) =
         let
-                val {exp=expTest, ty=tyTest} = transExp(tenv, venv, test, level)
-                val {exp=expThen, ty=tyThen} = transExp(tenv, venv, then', level)
+                val {exp=expTest, ty=tyTest} = transExp(tenv, venv, test, level, doneLabel)
+                val {exp=expThen, ty=tyThen} = transExp(tenv, venv, then', level, doneLabel)
         in 
                 if tyTest = T.INT then
                         case else'
                         of SOME e =>
-                                let val {exp=expElse, ty=tyElse} = transExp(tenv, venv, e, level)
+                                let val {exp=expElse, ty=tyElse} = transExp(tenv, venv, e, level, doneLabel)
                                 in
                                         if checkSame(tyThen, tyElse) then(
                                           let val ty=
                                                 case tyThen
                                                   of T.NIL => tyElse
                                                   | _ => tyThen
-                                          in {exp=Translate.ifThenElse(expTest, expThen, expBody),
+                                          in {exp=Translate.ifThenElse(expTest, expThen, expElse),
                                                 ty=ty}
                                           end
                                         )
@@ -259,15 +258,15 @@ and transIfExp(tenv, venv, A.IfExp{test, then', else', pos},
 (*******************************************************)
 (* Does produce no value means T.UNIT? *)
 and transWhileExp(tenv, venv, A.WhileExp {test, body, pos},
-                        level: Translate.level) =
+                        level: Translate.level, doneLabel) =
 	let
-		val {exp=expTest, ty=tyTest} = transExp(tenv, venv, test, level)
+		val {exp=expTest, ty=tyTest} = transExp(tenv, venv, test, level, doneLabel)
 	in loopLevel := !loopLevel + 1;
 		let
                         val labDone = Temp.newlabel()
                         val labBody = Temp.newlabel()
                         val labTest = Temp.newlabel()
-			val {exp=expBody , ty=tyBody} = transExp(tenv, venv, body, level)
+			val {exp=expBody , ty=tyBody} = transExp(tenv, venv, body, level, SOME labDone)
 		in
                         loopLevel := !loopLevel - 1;
                         case (tyTest, tyBody)
@@ -275,35 +274,40 @@ and transWhileExp(tenv, venv, A.WhileExp {test, body, pos},
                                 | (T.INT,_)		 =>(ErrorMsg.error pos "Body must produce no value";
                                                                         T.UNIT)
                                 | (_, T.UNIT)		 => (ErrorMsg.error pos "Test is not integer value";
-                                                        T.UNIT)
-                        end;
+                                                        T.UNIT);
                         {exp=Translate.whileExp(labDone, labBody, labTest, expBody, expTest),
                         ty=T.UNIT}
+                end
 	end
 
 (*******************************************************)
 
-and transForExp(tenv, venv, A.ForExp {var, escape, lo, hi, body, pos}, level: Translate.level) =
+and transForExp(tenv, venv, A.ForExp {var, escape, lo, hi, body, pos},
+                level: Translate.level, doneLabel) =
 	let 
-		val {exp=_ , ty=tyLo} = transExp(tenv, venv, lo, level)
-		val {exp=_ , ty=tyHi} = transExp(tenv, venv, hi, level)
-        val venv' = S.enter(venv, var, VarEnt{access=Translate.allocLocal(level)(!escape),
+		val {exp=expLo, ty=tyLo} = transExp(tenv, venv, lo, level, doneLabel)
+		val {exp=expHi, ty=tyHi} = transExp(tenv, venv, hi, level, doneLabel)
+
+                val labDone = Temp.newlabel()
+                val venv' = S.enter(venv, var, VarEnt{access=Translate.allocLocal(level)(!escape),
                                               ty=T.INT})
+                val {exp=expIndx, ty=_} = transVarExp(tenv, venv', A.SimpleVar(var, 0), level, doneLabel)
 	in
 		case (actual_ty tyLo, actual_ty tyHi)
 		of (T.INT, T.INT) =>
 			(loopLevel := !loopLevel + 1;
 			let 
-				val {exp=_ , ty=tyBody} = transExp(tenv, venv', body, level)
+				val {exp=expBody, ty=tyBody} = transExp(tenv, venv', body, level, SOME labDone)
 			in
 				loopLevel := !loopLevel - 1;
 				case tyBody
 				of T.UNIT => T.UNIT
 				| _ => (ErrorMsg.error pos "Body must produce no value";
-								T.UNIT)
+								T.UNIT);
+                                {exp=Translate.forExp(expIndx, expLo, expHi, expBody, labDone), ty=T.UNIT}
 			end)
 		| (_, _) => (ErrorMsg.error pos "lo/hi expressions must be integer value";
-								T.UNIT)
+				{exp=Translate.errorTree(7), ty=T.UNIT})
 	end
 
 (*******************************************************)
@@ -318,71 +322,71 @@ and transBreakExp(tenv, venv,  A.BreakExp pos, level: Translate.level) =
 (*******************************************************)
 
 and transArrayExp(tenv, venv, A.ArrayExp {typ,size,init,pos},
-                        level: Translate.level) = (
+                        level: Translate.level, doneLabel) = (
         case S.look(tenv,typ) of
           SOME (ty) => (
                 let
                         val arrty = actual_ty ty
                         val T.ARRAY(itemty, _) = arrty
-                        val {exp= sizeExp , ty=tySize} = transExp(tenv, venv, size, level)
-                        val {exp= initExp , ty=tyInit} = transExp(tenv, venv, init, level)
+                        val {exp= sizeExp , ty=tySize} = transExp(tenv, venv, size, level, doneLabel)
+                        val {exp= initExp , ty=tyInit} = transExp(tenv, venv, init, level, doneLabel)
                 in
                         if actual_ty(tySize) = T.INT then
                                 if checkDecType(itemty, tyInit) then
                                         {exp = Translate.arrayExp(sizeExp, initExp) ,ty = arrty}
                                 else (  ErrorMsg.error pos ("type mismatch " ^ S.name typ) ;
-					{exp = (), ty = T.INT})
+					{exp=Translate.errorTree(0), ty = T.INT})
                         else
                                 (ErrorMsg.error pos ("Array Size must be an Integer ");
-				{exp = (), ty = T.INT})
+				{exp=Translate.errorTree(0), ty = T.INT})
                 end
                 )
         | _ => (ErrorMsg.error pos ("undefined type " ^ S.name typ);
-               {exp = (), ty = T.INT})
+               {exp=Translate.errorTree(0), ty = T.INT})
         )
 (*******************************************************)
 
 and transVarExp(tenv, venv, A.SimpleVar(id,pos),
-                        level: Translate.level) =
+                        level: Translate.level, doneLabel) =
         (case Symbol.look(venv, id)
          of SOME (VarEnt{access= acc, ty= typ}) => { exp = Translate.simpleVar (acc, level), ty = actual_ty typ}
           | NONE => (ErrorMsg.error pos ("undefined variable " ^
                                                 S.name id);
-                        {exp = (), ty = T.INT})
+                        {exp=Translate.errorTree(9), ty = T.INT})
         )
   | transVarExp(tenv, venv, A.FieldVar(var, id, pos),
-                        level: Translate.level) =
+                        level: Translate.level, doneLabel) =
        let
-           val {exp = expVar , ty = tyVar} = transVarExp(tenv, venv, var, level) 
+           val {exp=expVar , ty=tyVar} = transVarExp(tenv, venv, var, level, doneLabel)
         in
             case tyVar
              of T.RECORD record => (  
                  let 
-                     val {index = index, ty = ty }  = findFieldType(T.RECORD record, id, 0, pos)
+                     val {index=index, ty=ty}  = findFieldType(T.RECORD record, id, 0, pos)
                  in
-                    {exp = Translate.fieldVar(expVar, index) , ty = ty}
+                    {exp = Translate.fieldVar(expVar, index) , ty=ty}
                  end
                  )
               | _ => (ErrorMsg.error pos "Accessing a field in non-record type";
-                        {exp = (), ty =T.INT} )
+                        {exp=Translate.errorTree(8), ty =T.INT} )
         end
   | transVarExp(tenv, venv, A.SubscriptVar(var, exp, pos),
-                        level: Translate.level) =  
+                        level: Translate.level, doneLabel) =  
         let 
-            val {exp = expVar , ty = tyVar} = transVarExp(tenv, venv, var, level) 
+            val {exp=expVar , ty=tyVar} = transVarExp(tenv, venv, var, level, doneLabel) 
         in
             case tyVar
              of T.ARRAY(arrty, unique) =>
-                let val {exp = indexExp , ty=tyexp} = transExp(tenv, venv, exp, level)
+                let val {exp = indexExp , ty=tyexp} = transExp(tenv, venv, exp, level, doneLabel)
                 in
                   case tyexp
-                    of T.INT => ({exp = Translate.subscriptVar(expVar, indexExp) , ty = actual_ty arrty})
+                    of T.INT => {exp=Translate.subscriptVar(expVar, indexExp), ty=actual_ty arrty}
                      | _ => (ErrorMsg.error pos "Array index must be of type INT";
-                                   { exp = (), ty = T.INT})
+                                   { exp=Translate.errorTree(4), ty=T.INT})
                 end
 
               | _ => (ErrorMsg.error pos "Accessing subscript of non-array type";
-                       { exp = (), ty = T.INT})
+                       { exp =Translate.errorTree(4), ty=T.INT})
         end
         
 
@@ -410,25 +414,29 @@ and transTy(tenv, A.NameTy(sym, pos)) =
         | NONE => (ErrorMsg.error pos "array type not defined in scope";
                    T.ARRAY(T.INT, ref ()))
 
-and transVarDec(tenv, venv, A.VarDec{name, escape, typ, init, pos}, level: Translate.level) =
-        let val {exp=(), ty=tyexp} = transExp(tenv, venv, init, level)
+and transVarDec(tenv, venv, A.VarDec{name, escape, typ, init, pos},
+                level: Translate.level, doneLabel) =
+        let val {exp=expInit, ty=tyexp} = transExp(tenv, venv, init, level, doneLabel)
+            val access=Translate.allocLocal(level)(!escape)
         in
         case typ
          of SOME(id, p) => (
                 case Symbol.look(tenv, id)
                  of SOME typ =>
                         if checkDecType(actual_ty typ, actual_ty tyexp) then
-                                {te=tenv, ve=S.enter(venv, name,
-                                                VarEnt{access=Translate.allocLocal(level)(!escape),
-                                                       ty=tyexp})}
+                                ({te=tenv, ve=S.enter(venv, name,
+                                                VarEnt{access=access,
+                                                       ty=tyexp})},
+                                Translate.assignment(access, expInit, level))
                         else (  ErrorMsg.error p "type mismatch";
-                                {te=tenv, ve=venv}
+                                ({te=tenv, ve=venv}, Translate.errorTree(2))
                         )
                   | NONE => (   ErrorMsg.error p "type not defined";
-                                {te=tenv, ve=venv}
+                                ({te=tenv, ve=venv}, Translate.errorTree(2))
                         )
                 )
-          | NONE => {te=tenv, ve=S.enter(venv, name, VarEnt{access=Translate.allocLocal(level)(!escape), ty=tyexp})}
+          | NONE => ({te=tenv, ve=S.enter(venv, name, VarEnt{access=access, ty=tyexp})},
+                        Translate.assignment(access, expInit, level))
         end
 
 and transFunHed(tenv, venv, [], _) =
@@ -463,8 +471,8 @@ and transFunHed(tenv, venv, [], _) =
         in transFunHed(tenv, venv', fundecs, level)
         end
 
-and transFunBod(tenv, venv, A.FunctionDec [], _) = ()
-  | transFunBod(tenv, venv, A.FunctionDec({name=name, params=paramsAbsyn, result=result, body=body, pos=pos}::fundecs), level: Translate.level) =
+and transFunBod(tenv, venv, A.FunctionDec [], _, doneLabel) = ()
+  | transFunBod(tenv, venv, A.FunctionDec({name=name, params=paramsAbsyn, result=result, body=body, pos=pos}::fundecs), level: Translate.level, doneLabel) =
         let fun params2venv(venv, []) = venv
               | params2venv(venv, {name, escape, typ, pos}::params) = (
                         params2venv(S.enter(venv, name,
@@ -480,16 +488,16 @@ and transFunBod(tenv, venv, A.FunctionDec [], _) = ()
         ((case S.look(venv, name)
          of SOME(FunEnt{level=bodyLev, label=_, params=parambools, res=res}) =>
                         (let val venv' = params2venv(venv, paramsAbsyn)
-                        in transExp(tenv, venv', body, bodyLev)
+                        in transExp(tenv, venv', body, bodyLev, doneLabel)
                         end;
                         ())
           | _ => (ErrorMsg.error pos "should never see this (fun)";
                   ()
                 ));
-        transFunBod(tenv, venv, A.FunctionDec(fundecs), level)
+        transFunBod(tenv, venv, A.FunctionDec(fundecs), level, doneLabel)
         )
         end
-  | transFunBod(_, _, _, _) =
+  | transFunBod(_, _, _, _, _) =
         (ErrorMsg.error 0 "unexpected error"; ())
 
 and transTypHed(tenv, venv, []) =
@@ -509,55 +517,64 @@ and transTypBod(tenv, venv, []) = ()
                 ));
         transTypBod(tenv, venv, typedecs))
 
-and transDecs(tenv, venv, A.VarDec dec::decs, level: Translate.level) =
-        let val {te=tenv', ve=venv'} = transVarDec(tenv, venv, A.VarDec dec, level)
-        in transDecs(tenv', venv', decs, level) end
-  | transDecs(tenv, venv, A.TypeDec dec::decs, level: Translate.level) =
+and transDecs(tenv, venv, A.VarDec dec::decs, level: Translate.level,
+                explist: Translate.exp list, doneLabel) =
+        let val ({te=tenv', ve=venv'}, exp) = transVarDec(tenv, venv, A.VarDec dec, level, doneLabel)
+        in transDecs(tenv', venv', decs, level, explist @ [exp], doneLabel) end
+  | transDecs(tenv, venv, A.TypeDec dec::decs, level: Translate.level,
+                explist: Translate.exp list, doneLabel) =
         let val {te=tenv', ve=venv'} = transTypHed(tenv, venv, dec)
         in transTypBod(tenv', venv', dec);
-           transDecs(tenv', venv', decs, level)
+           transDecs(tenv', venv', decs, level, explist, doneLabel)
         end
-  | transDecs(tenv, venv, A.FunctionDec dec::decs, level: Translate.level) =
+  | transDecs(tenv, venv, A.FunctionDec dec::decs, level: Translate.level,
+                explist: Translate.exp list, doneLabel) =
         let val {te=tenv', ve=venv'} = transFunHed(tenv, venv, dec, level)
-        in transFunBod(tenv', venv', A.FunctionDec dec, level);
-           transDecs(tenv', venv', decs, level)
+        in transFunBod(tenv', venv', A.FunctionDec dec, level, doneLabel);
+           transDecs(tenv', venv', decs, level, explist, doneLabel)
         end
-  | transDecs(tenv, venv, [], _) =
-        {te=tenv, ve=venv}
+  | transDecs(tenv, venv, [], _, explist: Translate.exp list, doneLabel) =
+        ({te=tenv, ve=venv}, explist)
 
 (*******************************************************)
 
-and transExp(tenv, venv, exp, level: Translate.level) =
+and transExp(tenv, venv, exp, level: Translate.level,
+                doneLabel: Temp.label option) =
 case exp of
-  A.OpExp opexp =>
-        transOpExp(tenv, venv, A.OpExp opexp, level)
-| A.VarExp var => transVarExp(tenv, venv, var, level)
-| A.NilExp =>
-        {exp=(), ty=T.NIL}
-| A.IntExp n =>
-        {exp=(), ty=T.INT}
-| A.StringExp(str, p) =>
-        {exp=(), ty=T.STRING}
-| A.CallExp callexp => transCallExp(tenv, venv, A.CallExp callexp, level)
-| A.RecordExp recexp => transRecordExp(tenv, venv, A.RecordExp recexp, level)
-| A.SeqExp seqexp =>
-        {exp=(), ty=actual_ty(transSeqExp(tenv, venv, A.SeqExp seqexp, level))}
-| A.AssignExp assignexp =>
-        {exp=(), ty=actual_ty(transAssignExp(tenv, venv, A.AssignExp assignexp, level))}
-| A.IfExp ifexp =>
-        transIfExp(tenv, venv, A.IfExp ifexp, level)
-| A.WhileExp whilexp =>
-        transWhileExp(tenv, venv, A.WhileExp whilexp, level)
-| A.ForExp forexp =>
-        {exp=(), ty=actual_ty(transForExp(tenv, venv, A.ForExp forexp, level))}
-| A.BreakExp breakexp =>
-        {exp=(), ty=actual_ty(transBreakExp(tenv, venv,  A.BreakExp breakexp, level))}
-| A.LetExp {decs, body, pos} =>
-        let val {te=tenv', ve=venv'} =
-                        transDecs(tenv, venv, decs, level)
-        in transExp(tenv', venv', body, level)
-        end
-| A.ArrayExp arrexp => transArrayExp(tenv, venv, A.ArrayExp arrexp, level)
+  A.OpExp opexp =>(     print("transOpExp\n");
+        transOpExp(tenv, venv, A.OpExp opexp, level, doneLabel))
+| A.VarExp var =>(      print("transVarExp\n");
+        transVarExp(tenv, venv, var, level, doneLabel))
+| A.NilExp =>(          print("transNilExp\n");
+        {exp=Translate.nilExp(), ty=T.NIL})
+| A.IntExp n =>(        print("transIntExp\n");
+        {exp=Translate.intExp(n), ty=T.INT})
+| A.StringExp(str, p) =>(       print("transStringExp\n");
+        {exp=Translate.strExp(str), ty=T.STRING})
+| A.CallExp callexp =>(         print("transCallExp\n");
+        transCallExp(tenv, venv, A.CallExp callexp, level, doneLabel))
+| A.RecordExp recexp =>(        print("transRecordExp\n");
+        transRecordExp(tenv, venv, A.RecordExp recexp, level, doneLabel))
+| A.SeqExp seqexp =>(           print("transSeqExp\n");
+        transSeqExp(tenv, venv, A.SeqExp seqexp, level, doneLabel, []))
+| A.AssignExp assignexp =>(     print("transAssignExp\n");
+        transAssignExp(tenv, venv, A.AssignExp assignexp, level, doneLabel))
+| A.IfExp ifexp =>(             print("transIfExp\n");
+        transIfExp(tenv, venv, A.IfExp ifexp, level, doneLabel))
+| A.WhileExp whilexp =>(        print("transWhileExp\n");
+        transWhileExp(tenv, venv, A.WhileExp whilexp, level, doneLabel))
+| A.ForExp forexp =>(           print("transForExp\n");
+        transForExp(tenv, venv, A.ForExp forexp, level, doneLabel))
+| A.BreakExp breakexp =>(       print("transBreakExp\n");
+        {exp=Translate.break(doneLabel), ty=actual_ty(transBreakExp(tenv, venv,  A.BreakExp breakexp, level))})
+| A.LetExp {decs, body, pos} =>(print("transLetExp\n");
+        let val ({te=tenv', ve=venv'}, explist: Translate.exp list) =
+                        transDecs(tenv, venv, decs, level, [], doneLabel)
+            val {exp=exp, ty=ty} = transExp(tenv', venv', body, level, doneLabel)
+        in  {exp=Translate.prepend(explist, exp), ty=ty}
+        end)
+| A.ArrayExp arrexp =>(         print("transArrayExp\n");
+        transArrayExp(tenv, venv, A.ArrayExp arrexp, level, doneLabel))
 
 (*******************************************************)
 
@@ -648,9 +665,11 @@ and transProg(exp) =
                 FE.findEscape(exp);
 
                 (* recurse *)
-                transExp(tenv, venv, exp, Translate.outermost);
+                let val {exp=expTree, ty=_} = transExp(tenv, venv, exp, Translate.outermost, NONE)
+                in Translate.printTree(expTree)
+                end;
 
-                (* return UNIT *)
+                (* return frag list *)
                 exp
         end)
 end

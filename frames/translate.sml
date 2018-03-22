@@ -31,6 +31,7 @@ sig
         val whileExp: Temp.label * Temp.label *
                         Temp.label *exp * exp
                         -> exp
+        val forExp: exp * exp * exp * exp * Temp.label -> exp
         val ifThenElse: exp * exp * exp -> exp
         val ifThen: exp * exp -> exp
 
@@ -40,10 +41,16 @@ sig
         val strExp: string -> exp
         val assignment: access * exp * level -> exp
         val break: Temp.label option -> exp
+        val intExp: int -> exp
+        val nilExp: unit -> exp
+        val assignExp: exp * exp -> exp
+        val seqExp: exp list * exp -> exp
 
         val prepend: exp list * exp -> exp
 
         val errorTree: int -> exp
+
+        val printTree: exp -> unit
 end
 
 structure Translate : TRANSLATE =
@@ -156,15 +163,17 @@ struct
         (************************************************)
         (* HELPER FUNCTIONS                             *)
 
+        fun printTree(t: exp) = Printtree.printtree(TextIO.stdOut, unNx(t))
+
         fun prepend(explist: exp list, exp: exp) =
                 let val ex = unEx(exp)
                     fun explist2stm(exp :: []) = unNx(exp)
                       | explist2stm(exp :: rest) =
-                          let val nx = unNx(exp)
-                          in  T.SEQ(nx, explist2stm(rest))
-                          end
-                    val stm = explist2stm(explist)
-                in Ex(T.ESEQ(stm, ex))
+                          T.SEQ(unNx exp, explist2stm(rest))
+                in
+                        case explist
+                         of [] => Ex(ex)
+                          | _ => Ex(T.ESEQ(explist2stm(explist), ex))
                 end
 
         fun errorTree(n: int) = Ex(T.MEM(T.CONST n))
@@ -176,13 +185,13 @@ struct
 
         (*****************************************)
         (* function to translate simple variable *)
-     
+
         fun simpleVarRec(acc: access, alev: int, t: T.exp) =
                 let val dlev = #1 acc
                     val frAcc = #2 acc
                 in
-                        case Table.look(!HT, dlev)
-                         of NONE => (ErrorMsg.error 0 "could not find frame"; Tree.MEM(T.CONST 0))
+                        case Table.look(!HT, alev)
+                         of NONE => (ErrorMsg.error 0 "could not find frame of variable"; Tree.MEM(T.CONST 0))
                           | SOME f => if dlev = alev
                                       then Frame.exp(frAcc)(t)
                                       else simpleVarRec(acc, #parent f, T.MEM(t))
@@ -234,8 +243,29 @@ struct
                                  T.SEQ(T.LABEL labBody,
                                  T.SEQ(exBod,
                                  T.SEQ(T.LABEL labTest,
-                                 T.SEQ(exTest(labBody, labDone),
-                                        T.LABEL labDone))))))
+                                 T.SEQ(exTest(labBody, labDone), T.LABEL labDone))))))
+                end
+
+        fun forExp(expIndx: exp, expInit: exp, expHi: exp, expBody: exp,
+                        labDone: Temp.label) =
+                let val exHi = unEx(expHi)
+                    val exLo = unEx(expInit)
+                    val exBody = unNx(expBody)
+                    val exIndx = unEx(expIndx)
+
+                    val labBody = Temp.newlabel()
+                    val labTest = Temp.newlabel()
+                    val tempHi = Temp.newtemp()
+
+                in  Nx(T.SEQ(T.MOVE(exIndx, exLo),
+                       T.SEQ(T.MOVE(T.TEMP tempHi, exHi),
+                       T.SEQ(T.LABEL labTest,
+                       T.SEQ(T.CJUMP(T.LE, exIndx, T.TEMP tempHi, labBody, labDone),
+                       T.SEQ(T.LABEL labBody,
+                       T.SEQ(exBody,
+                       T.SEQ(T.MOVE(exIndx, T.BINOP(T.PLUS, exIndx, T.CONST 1)),
+                       T.SEQ(T.JUMP(T.NAME labTest, [labTest]), T.LABEL labDone))))))))
+                    )
                 end
 
         fun ifThenElse(expTest: exp, expThen: exp, expElse: exp) =
@@ -294,10 +324,10 @@ struct
        fun callExpRec(callerLev: int, funLev : int, t ) =
              case (Table.look(!HT, callerLev), Table.look(!HT, funLev))
               of (SOME callerFrame, SOME targetFrame) =>
-                        if #parent callerFrame = #parent targetFrame
+                        if callerLev = #parent targetFrame
                         then T.MEM(t)
                         else callExpRec(#parent callerFrame, funLev, T.MEM(t))
-               | (_, _) => (ErrorMsg.error 0 "could not find frame"; T.MEM(T.CONST 0))
+               | (_, _) => (ErrorMsg.error 0 "could not find frame of function"; T.MEM(T.CONST 0))
 
        fun callExp(funLevel, callerLevel, funLabel, argexps) =
            let val staticlink = callExpRec(callerLevel, funLevel, T.TEMP Frame.FP)
@@ -319,4 +349,22 @@ struct
                 case label
                  of NONE => errorTree(6)
                   | SOME l => Nx(T.JUMP(T.NAME l, [l]))
+
+        fun intExp(x: int) = Ex(T.CONST x)
+
+        fun nilExp() = Ex(T.CONST 0)
+
+        fun assignExp(expVar: exp, expInit: exp) =
+                let val exVar = unEx expVar
+                    val exInit = unEx expInit
+                in  Nx(T.MOVE(exVar, exInit))
+                end
+
+        fun seqExp(expList: exp list, expLast: exp) =
+                let fun makeSeq([]) = T.EXP(T.CONST 0)
+                      | makeSeq(exp :: []) = unNx exp
+                      | makeSeq(exp :: om :: rest) = T.SEQ(unNx exp, makeSeq(om :: rest))
+                    val seq = makeSeq(expList)
+                in Ex(T.ESEQ(seq, unEx expLast))
+                end
 end
