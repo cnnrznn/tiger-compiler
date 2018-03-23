@@ -67,7 +67,10 @@ struct
         val fragList: Frame.frag list ref = ref []
 
         (********************************************************)
-        (* A comment should explain this block of code.         *)
+        (* The Translate struct has a ref hash table for     *)
+        (* mapping levels (ints) to frames. This is useful      *)
+        (* for "walking" up from a child level to a parent      *)
+        (* level, for allocating local variables, etc.          *)
 
         structure Table = IntMapTable(type key=level
                                 fun getInt level = level)
@@ -327,7 +330,7 @@ struct
              case (Table.look(!HT, callerLev), Table.look(!HT, funLev))
               of (SOME callerFrame, SOME targetFrame) =>
                         if callerLev = #parent targetFrame
-                        then T.MEM(t)
+                        then t
                         else callExpRec(#parent callerFrame, funLev, T.MEM(t))
                | (_, _) => (ErrorMsg.error 0 "could not find frame of function"; T.MEM(T.CONST 0))
 
