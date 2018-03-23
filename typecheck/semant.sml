@@ -488,7 +488,8 @@ and transFunBod(tenv, venv, A.FunctionDec [], _, doneLabel) = ()
         ((case S.look(venv, name)
          of SOME(FunEnt{level=bodyLev, label=_, params=parambools, res=res}) =>
                         (let val venv' = params2venv(venv, paramsAbsyn)
-                        in transExp(tenv, venv', body, bodyLev, doneLabel)
+                             val {exp=expBody, ty=_} = transExp(tenv, venv', body, bodyLev, doneLabel)
+                        in Translate.procEntryExit{level=bodyLev, bodyExp=expBody}
                         end;
                         ())
           | _ => (ErrorMsg.error pos "should never see this (fun)";

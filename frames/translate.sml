@@ -19,14 +19,13 @@ sig
         val unNx: exp -> Tree.stm
         val unCx: exp -> Temp.label * Temp.label -> Tree.stm
 
-        val procEntryExit: {level: level, body: exp} -> unit
+        val procEntryExit: {level: level, bodyExp: exp} -> unit
 
         val getResult: unit -> Frame.frag list
 
         val simpleVar: access * level -> exp
         val subscriptVar : exp * exp -> exp
         val fieldVar: exp * int -> exp
-
         val binop: A.oper * exp * exp -> exp
         val whileExp: Temp.label * Temp.label *
                         Temp.label *exp * exp
@@ -34,7 +33,6 @@ sig
         val forExp: exp * exp * exp * exp * Temp.label -> exp
         val ifThenElse: exp * exp * exp -> exp
         val ifThen: exp * exp -> exp
-
         val recordExp: exp list -> exp
         val arrayExp : exp * exp -> exp
         val callExp: level * level * Temp.label * exp list -> exp
@@ -178,8 +176,12 @@ struct
 
         fun errorTree(n: int) = Ex(T.MEM(T.CONST n))
 
-        fun procEntryExit{level: level, body: exp} =
-                ()
+        fun procEntryExit{level: level, bodyExp: exp} =
+                let val body = T.MOVE(T.TEMP Frame.RV, unEx bodyExp)
+                in case Table.look(!HT, level)
+                    of NONE => ErrorMsg.error 0 "catastrophic error"
+                     | SOME f => fragList := Frame.PROC{body=body, frame=f} :: !fragList
+                end
 
         fun getResult() = !fragList
 
