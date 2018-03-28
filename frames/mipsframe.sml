@@ -14,8 +14,24 @@ struct
                       | STRING of Temp.label * string
 
         val wordSize = 4
-        val FP = Temp.newtemp()
+
+        type register = string
+        val tempMap (*incomplete*)
+
+        (* registers *)
+
+        val FP = Temp.newtemp() 
+        val SP = Temp.newtemp()
         val RV = Temp.newtemp()
+        val RA = Temp.newtemp()
+        
+        val specialargs = [RV,FP,SP,RA]
+
+        val argregs = []
+
+        val calleesaves = []
+
+        val callersaves = []
 
         fun formals(f:frame) = #formals f
 

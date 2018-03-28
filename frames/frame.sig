@@ -2,6 +2,9 @@ signature FRAME =
 sig 
         type frame
         type access
+        type register
+
+        val tempMap : register Temp.Table.table
         val newFrame : {name: Temp.label,
                        formals: bool list,
                        parent: int}
@@ -12,6 +15,13 @@ sig
      
         val FP: Temp.temp
         val RV: Temp.temp
+        val RA: Temp.temp 
+        val SP: Temp.temp
+        val specialargs : Temp.temp list
+        val argregs : Temp.temp list
+        val callersaves : Temp.temp list
+        val calleesaves : Temp.temp list      
+
         val wordSize : int
         val exp: access -> Tree.exp -> Tree.exp
         val externalCall: string * Tree.exp list -> Tree.exp
