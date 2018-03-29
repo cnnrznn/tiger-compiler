@@ -664,10 +664,13 @@ and transProg(exp) =
         in
                 (* find escaping variables *)
                 FE.findEscape(exp);
+                PrintAbsyn.print(TextIO.stdOut, exp);
 
                 (* recurse *)
                 let val {exp=expTree, ty=_} = transExp(tenv, venv, exp, Translate.outermost, NONE)
-                in  Translate.printTree(expTree);
+                in  
+                    
+                    Translate.printTree(expTree);
                     Translate.procEntryExit{level=Translate.outermost,
                                             bodyExp=expTree}
                 end;
