@@ -183,7 +183,7 @@ struct
                 let val body = T.MOVE(T.TEMP Frame.RV, unEx bodyExp)
                 in case Table.look(!HT, level)
                     of NONE => ErrorMsg.error 0 "catastrophic error"
-                     | SOME f => fragList := Frame.PROC{body=body, frame=f} :: !fragList
+                     | SOME f => fragList := Frame.PROC{body=Frame.procEntryExit1(f, body), frame=f} :: !fragList
                 end
 
         fun getResult() = !fragList
