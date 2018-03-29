@@ -24,8 +24,8 @@ datatype stm = SEQ of stm * stm
       and relop = EQ | NE | LT | GT | LE | GE 
 	        | ULT | ULE | UGT | UGE
 
-  (*val notRel : relop -> relop
-  val commute: relop -> relop*)
+  val notRel : relop -> relop
+  (* val commute: relop -> relop *)
 end
 
 structure Tree : TREE = 
@@ -53,6 +53,19 @@ datatype stm = SEQ of stm * stm
 
       and relop = EQ | NE | LT | GT | LE | GE 
 	        | ULT | ULE | UGT | UGE
+      
+    fun notRel oper =
+      case oper of
+      	EQ => NE
+    	| NE => EQ
+    	| LT => GE
+    	| GT => LE
+    	| LE => GT
+  	| GE => LT
+    	| ULT => UGE
+   	| UGT => ULE
+    	| ULE => UGT
+    	| UGE => ULT
 
 end
 

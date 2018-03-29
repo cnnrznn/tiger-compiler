@@ -4,7 +4,6 @@ sig
         type access
         type register
 
-        val tempMap : register Temp.Table.table
         val newFrame : {name: Temp.label,
                        formals: bool list,
                        parent: int}
@@ -17,7 +16,39 @@ sig
         val RV: Temp.temp
         val RA: Temp.temp 
         val SP: Temp.temp
-        val specialargs : Temp.temp list
+
+        (* function argument registers *)
+        val a0: Temp.temp
+        val a1: Temp.temp
+        val a2: Temp.temp
+        val a3: Temp.temp
+          
+        (* caller saved registers *)
+        val t0 : Temp.temp
+        val t1 : Temp.temp 
+        val t2 : Temp.temp
+        val t3 : Temp.temp
+        val t4 : Temp.temp
+        val t5 : Temp.temp
+        val t6 : Temp.temp
+        val t7 : Temp.temp
+        val t8 : Temp.temp
+        val t9 : Temp.temp
+
+        (* callee saved registers *)
+
+        val s0 : Temp.temp
+        val s1 : Temp.temp 
+        val s2 : Temp.temp
+        val s3 : Temp.temp
+        val s4 : Temp.temp
+        val s5 : Temp.temp
+        val s6 : Temp.temp
+        val s7 : Temp.temp
+        
+        
+
+        val specialregs : Temp.temp list
         val argregs : Temp.temp list
         val callersaves : Temp.temp list
         val calleesaves : Temp.temp list      

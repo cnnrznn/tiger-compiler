@@ -34,23 +34,23 @@ structure MipsGen : CODEGEN = struct
           | toMipsStr_z T.GE = "bgez"
 
 
-       fun munchStm(T.SEQ (a,b)) = (munchStm a; munchStam b)
+       fun munchStm(T.SEQ (a,b)) = (munchStm a; munchStm b)
            (* store instructions *)
            | munchStm (T.MOVE(T.MEM(T.BINOP(T.PLUS, e1, T.CONST i)), e2)) = 
-		emit(A.oper{assem = "sw `s1 , "^ Int.toString i ^ "(`s0) \n", src = [munchExp e1, munchExp e2], dst = [], jump = NONE }) 
+		emit(A.OPER {assem = "sw `s1 , "^ Int.toString i ^ "(`s0) \n", src = [munchExp e1, munchExp e2], dst = [], jump = NONE }) 
 
            | munchStm (T.MOVE(T.MEM(T.BINOP(T.PLUS, T.CONST i, e1)), e2)) =
-		emit(A.oper{assem = "sw `s1 , "^ Int.toString i ^ "(`s0) \n", src = [munchExp e1, munchExp e2], dst = [], jump = NONE })
+		emit(A.OPER {assem = "sw `s1 , "^ Int.toString i ^ "(`s0) \n", src = [munchExp e1, munchExp e2], dst = [], jump = NONE })
 
            | munchStm (T.MOVE(T.MEM(e1) , e2)) =
-		emit(A.oper{assem = "sw `s1 , (`s0) \n", src = [munchExp e1, munchExp e2], dst = [], jump = NONE })
+		emit(A.OPER {assem = "sw `s1 , (`s0) \n", src = [munchExp e1, munchExp e2], dst = [], jump = NONE })
 
            (* load instructions *) 
            | munchStm(T.MOVE(T.TEMP r, T.CONST i)) = 
 		emit(A.OPER {assem = "li `d0, " ^ Int.toString i ^ "\n",src = [], dst = [r], jump = NONE})
 
            | munchStm(T.MOVE(T.TEMP r, T.NAME lab )) = 
-                emit( A.OPER {assem="la `d0, " ^ Temp.label lab ^ "\n", src=[], dst=[r], jump=NONE})
+                emit( A.OPER {assem="la `d0, " ^ Symbol.name lab ^ "\n", src=[], dst=[r], jump=NONE})
 
            | munchStm( T.MOVE(T.TEMP r, T.MEM(T.BINOP(T.PLUS, e1, T.CONST i)))) = 
                 emit( A.OPER {assem="lw `d0, " ^ Int.toString i ^ "(`s0)\n", src=[munchExp e1], dst=[r], jump=NONE})
@@ -59,14 +59,12 @@ structure MipsGen : CODEGEN = struct
                 emit( A.OPER {assem="lw `d0, " ^ Int.toString i ^ "(`s0)\n", src=[munchExp e1], dst=[r], jump=NONE})
 
            | munchStm (T.MOVE(T.TEMP r, e)) =
-                emit(A.MOVE {assem= "move `d0, `s0 \n", src = [munchExp e] , dst = [r]})
+                emit(A.MOVE {assem= "move `d0, `s0 \n", src = munchExp e , dst = r})
 
            | munchStm (T.LABEL lab) =
 		emit(A.LABEL {assem= Symbol.name lab ^ ":\n", lab=lab}) (*doubt: is label always followed by a colon?*)
 
-           | munchStm (T.EXP e)= (munchExp e; ())
-
-           | munchStm(T.JUMP(T.LABEL lab , lablist)) =
+           | munchStm(T.JUMP(T.NAME lab , lablist)) =
                 emit( A.OPER {assem="j " ^ Symbol.name lab ^ "\n", src=[], dst=[], jump=SOME(lablist)})
  
            | munchStm(T.JUMP(e, lablist)) =
@@ -78,8 +76,13 @@ structure MipsGen : CODEGEN = struct
            | munchStm(T.CJUMP(relop, e1, e2, l1, l2)) = 
 		emit(A.OPER {assem= (toMipsStr relop) ^ "`s0, `s1, `j0 \n b `j1", src=[munchExp e1, munchExp e2], dst=[], jump=SOME [l1, l2]})
 
-           | munchExp(T.EXP (T.CALL(T.NAME (n), args)))=
-		emit(A.OPER {assem = "jal " ^ Symbol.name n ^ "\n", src =, dst= , jump=NONE}) (*incomplete *)
+           | munchStm(T.EXP (T.CALL(T.NAME (n), args))) =
+                let
+                    val calldefs = Frame.RV :: Frame.RA :: Frame.calleesaves
+                in 
+		    emit(A.OPER {assem = "jal " ^ Symbol.name n ^ "\n", src = munchArgs(0,n, args) , dst= calldefs , jump=NONE}) (*incomplete *)
+                end
+           | munchStm (T.EXP e)= (munchExp e; ())
 
            (* mem load expressions *)
        and munchExp(T.MEM(T.BINOP(T.PLUS, e, T.CONST i))) =
@@ -124,9 +127,20 @@ structure MipsGen : CODEGEN = struct
       		result(fn r => emit(A.OPER {assem=" la `d0, " ^ Symbol.name n ^ "\n" , src=[] , dst=[r], jump=NONE}))
 
            | munchExp(T.TEMP t) = t
-		
 
-        and munchArgs()
+        and munchArgs( i ,n, arg::rest ) =
+  	       ( if i < 4 then
+                     let val reg = List.nth(Frame.argregs, i)
+                     in munchStm(T.MOVE( T.TEMP reg , arg ))
+                     end                  
+                 else
+                   (munchStm(T.MOVE(T.MEM(T.TEMP Frame.SP) , arg));
+                    munchStm(T.MOVE(T.TEMP Frame.SP, T.BINOP(T.MINUS, T.TEMP Frame.SP, T.CONST Frame.wordSize))));
+                  
+                 munchArgs(i+1,n, rest) )
+                 
+            | munchArgs(i ,n, [] ) =  ( munchStm(T.MOVE(T.TEMP Frame.FP, T.TEMP Frame.SP)) ; 
+                                        munchStm(T.MOVE(T.TEMP Frame.SP, T.BINOP(T.MINUS, T.TEMP Frame.SP, T.CONST 0))); [])
 
    in munchStm stm;
       rev (!ilist)
