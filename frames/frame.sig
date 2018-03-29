@@ -51,7 +51,10 @@ sig
         val specialregs : Temp.temp list
         val argregs : Temp.temp list
         val callersaves : Temp.temp list
-        val calleesaves : Temp.temp list      
+        val calleesaves : Temp.temp list   
+       
+        val tempMap : register Temp.Table.table
+        val makeString : Temp.temp -> register
 
         val wordSize : int
         val exp: access -> Tree.exp -> Tree.exp

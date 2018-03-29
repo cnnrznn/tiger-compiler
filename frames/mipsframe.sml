@@ -59,6 +59,22 @@ struct
 
         val callersaves = [t0,t1,t2,t3,t4,t5,t6,t7,t8,t9]
 
+        val tempMap =
+          let       
+             val regList = [(RV, "RV"), (SP, "SP"),(FP, "FP"),(RA, "RA"),
+                             (a0, "a0"), (a1, "a1"), (a2, "a2"), (a3, "a3"),
+			     (s0, "s0"), (s1, "s1"), (s2, "s2"), (s3, "s3"), (s4, "s4"), (s5, "s5"), (s6, "s6"), (s7, "s7"),
+			     (t0, "t0"), (t1, "t1"), (t2, "t2"), (t3, "t3"), (t4, "t4"), (t5, "t5"), (t6, "t6"), (t7, "t7"), (t8, "t8"), (t9, "t9")]
+             fun enterTable ((reg, name), table) = Temp.Table.enter(table, reg, name)
+          in  
+             List.foldr enterTable Temp.Table.empty regList
+          end
+
+        fun makeString temp =
+          case Temp.Table.look (tempMap, temp) of
+              SOME str => str
+              | NONE => Temp.makestring temp     
+  
         fun formals(f:frame) = #formals f
 
         fun name(f: frame) = #label f
