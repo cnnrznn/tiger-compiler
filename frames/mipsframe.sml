@@ -74,6 +74,8 @@ struct
           case Temp.Table.look (tempMap, temp) of
               SOME str => str
               | NONE => Temp.makestring temp     
+
+        fun string(lab, s) = (Symbol.name lab) ^ ": .ascii \"" ^ s ^"\" \n"
   
         fun formals(f:frame) = #formals f
 

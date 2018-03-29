@@ -55,6 +55,7 @@ sig
        
         val tempMap : register Temp.Table.table
         val makeString : Temp.temp -> register
+        val string: Temp.label * string -> string
 
         val wordSize : int
         val exp: access -> Tree.exp -> Tree.exp
