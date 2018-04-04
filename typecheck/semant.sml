@@ -663,7 +663,7 @@ and transProg(exp) =
                                                                                res=T.UNIT})
         in
                 (* find escaping variables *)
-                FE.findEscape(exp);
+                (*FE.findEscape(exp);*)
                 PrintAbsyn.print(TextIO.stdOut, exp);
 
                 (* recurse *)

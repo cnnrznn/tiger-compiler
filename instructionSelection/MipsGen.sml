@@ -127,6 +127,13 @@ structure MipsGen : CODEGEN = struct
       		result(fn r => emit(A.OPER {assem=" la `d0, " ^ Symbol.name n ^ "\n" , src=[] , dst=[r], jump=NONE}))
 
            | munchExp(T.TEMP t) = t
+           | munchExp(T.CALL(T.NAME (n), args)) =
+                let
+                    val calldefs = Frame.RV :: Frame.RA :: Frame.calleesaves
+                in 
+		    emit(A.OPER {assem = "jal " ^ Symbol.name n ^ "\n", src = munchArgs(0,n, args) , dst= calldefs , jump=NONE});
+                    Frame.RV
+                end
 
         and munchArgs( i ,n, arg::rest ) =
   	       ( if i < 4 then
@@ -140,7 +147,8 @@ structure MipsGen : CODEGEN = struct
                  munchArgs(i+1,n, rest) )
                  
             | munchArgs(i ,n, [] ) =  ( munchStm(T.MOVE(T.TEMP Frame.FP, T.TEMP Frame.SP)) ; 
-                                        munchStm(T.MOVE(T.TEMP Frame.SP, T.BINOP(T.MINUS, T.TEMP Frame.SP, T.CONST 0))); [])
+                                        emit( A.OPER {assem="addi `s0, `s0," ^ Symbol.name n ^"_fs \n", src=[munchExp (T.TEMP Frame.SP)], dst=[], jump=NONE} )
+                                        ; [])
 
    in munchStm stm;
       rev (!ilist)
