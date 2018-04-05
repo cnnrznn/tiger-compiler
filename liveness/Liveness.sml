@@ -183,12 +183,12 @@ end = struct
                         (* make edges between def and live temps*)
                         (* before making edges check if the node is already present in the igraph for that temp*)
                         (* if not make a node *) 
-                     ( List.app ( ( fn d =>  
+                      List.app ( ( fn d =>  
                                       List.app ((fn l =>
                                                     if d = l then ()
                                                     else Graph.mk_edge {from= tempToNode d , to =  tempToNode l }) ,
                                                 liveList), 
-                                 defList)   );
+                                 defList) ;
                       (* adding tuples to moves datastructure *)
                       case Graph.Table.look(ismove, node) of
                          SOME b => (if b then
