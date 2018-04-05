@@ -77,7 +77,7 @@ end = struct
                     val (outTable, outList) = case Graph.Table.look (liveOutMap, node) of
                                               SOME u => u
                     val succ_n = Graph.succ node
-                    val outList_dups = List.foldr (fn (l,s) => 
+                    val outList_dups = List.foldr (fn (s,l) => 
 							let val (_, inList) = case Graph.Table.look (liveInMap, node) of
                                                                               SOME m => m
                                                         in inList @ l
@@ -180,18 +180,18 @@ end = struct
                         (* make edges between def and live temps*)
                         (* before making edges check if the node is already present in the igraph for that temp*)
                         (* if not make a node *) 
-                      List.app ( (fn d =>
-                                      List.app ((fn l =>
+                      (List.app (fn d =>
+                                      List.app (fn l =>
                                                     if d = l then ()
-                                                    else Graph.mk_edge {from= tempToNode d , to =  tempToNode l }) ,
-                                                liveList)),
-                                 defList);
+                                                    else Graph.mk_edge {from= tempToNode d , to =  tempToNode l })
+                                                liveList)
+                                 defList;
                       (* adding tuples to moves datastructure *)
                       case Graph.Table.look(ismove, node) of
                          SOME b => (if b then
-                                      moves := (List.hd useList, List.hd defList ) :: !moves
+                                      moves := (tempToNode (List.hd useList), tempToNode (List.hd defList) ) :: !moves
                                    else () )
-                         |NONE => ErrorMsg.error 0 "Catastrophic error in addEgdes "
+                         |NONE => ErrorMsg.error 0 "Catastrophic error in addEgdes ")
                     end
              in
                  List.app addEdges nodes;
