@@ -6,8 +6,8 @@ sig
 		   gtemp: Graph.node -> Temp.temp,
 		   moves: (Graph.node * Graph.node) list }
     val interferenceGraph :
-        Flow.flowgraph -> igraph * (Flow.Graph.node -> Temp.temp list)
-    val show : outstream * igraph -> unit 
+        Flow.flowgraph -> igraph * (Graph.node -> Temp.temp list)
+    (*val show : outstream * igraph -> unit *)
 end = struct
  
     (* interference graph datastructure *)
@@ -36,7 +36,7 @@ end = struct
     (* it has helper functions to solve the dataflow equations and make *)
     (* node wise updates to the live-in and live-out maps               *)
 
-    fun calcLiveness (Flow.FGRAPH { control, def, use, isMove }) =
+    fun calcLiveness ({ control, def, use, ismove }: Flow.flowgraph) =
 
         let 
            (* initialize the liveset and liveMap structures *)
@@ -50,16 +50,12 @@ end = struct
                 let
 		    val (inTable, inList) = case Graph.Table.look (liveInMap, node) of
                                             SOME u => u
-                                           | NONE => ErrorMsg.error 0 "Error in liveInMapUpdate"
                     val (_, outList) = case Graph.Table.look (liveOutMap, node) of
                                               SOME u => u
-                                             | NONE => ErrorMsg.error 0 "Error in liveOutMapUpdate"
                     val useList = case Graph.Table.look (use, node) of
                                    SOME u => u
-                                   | NONE => ErrorMsg.error 0 "Error in liveInMapUpdate"
           	    val defList =  case Graph.Table.look (def, node) of
                                    SOME d => d
-                                   | NONE => ErrorMsg.error 0 "Error in liveInMapUpdate"
                     val filterOut = List.filter
               			(fn t => 
                                  case ( List.find (fn d => t = d) defList)
@@ -80,12 +76,10 @@ end = struct
                 let
                     val (outTable, outList) = case Graph.Table.look (liveOutMap, node) of
                                               SOME u => u
-                                             | NONE => ErrorMsg.error 0 "Error in liveOutMapUpdate"
                     val succ_n = Graph.succ node
                     val outList_dups = List.foldr (fn (l,s) => 
 							let val (_, inList) = case Graph.Table.look (liveInMap, node) of
                                                                               SOME m => m
-                                                                             | NONE => ErrorMsg.error 0 "Error in liveOutMapUpdate"
                                                         in inList @ l
                                                         end ) [] succ_n
                     
@@ -178,8 +172,8 @@ end = struct
                 fun addEdges(node)=
                     let
                        (*get the defs *)
-                       val defList = Graph.Table.look (def, node)
-                       val useList = Graph.Table.look (use, node)
+                       val defList = case Graph.Table.look (def, node) of SOME dl => dl
+                       val useList = case Graph.Table.look (use, node) of SOME ul => ul
                        (* get live temps *)
                        val (liveTable, liveList) = Graph.Table.look (liveOutMap, node)                         
                     in
@@ -191,7 +185,7 @@ end = struct
                                                     if d = l then ()
                                                     else Graph.mk_edge {from= tempToNode d , to =  tempToNode l }) ,
                                                 liveList), 
-                                 defList) ;
+                                 defList));
                       (* adding tuples to moves datastructure *)
                       case Graph.Table.look(ismove, node) of
                          SOME b => (if b then

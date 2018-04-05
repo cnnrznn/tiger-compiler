@@ -32,7 +32,11 @@ canon.sml
 main.sml
 MipsGen.sml
 
-
+../liveness/graph.sml
+../liveness/graph.sig
+../liveness/Flow.sml
+../liveness/MakeGraph.sml
+../liveness/Liveness.sml
 
 $/ml-yacc-lib.cm
 $/smlnj-lib.cm
