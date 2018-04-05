@@ -139,11 +139,11 @@ end = struct
         end
 
     (* function which performs liveness analysis and  builds the interference graph for all the temps *)
-    fun interferenceGraph (Flow.FGRAPH { control, def, use, ismove }) =
+    fun interferenceGraph ({ control, def, use, ismove }: Flow.flowgraph) =
         let
 
            (* perform liveness analysis and get live-in and live-out maps *)
-           val (liveInMap, liveOutMap) = calcLiveness( Flow.FGRAPH { control=control, def=def, use=use, ismove=ismove })
+           val (liveInMap, liveOutMap) = calcLiveness({ control=control, def=def, use=use, ismove=ismove }: Flow.flowgraph)
            (* initialize the graph *)
            val graph = Graph.newGraph ()
            (* a table to keep track of the temp-> node mapping *)
@@ -159,7 +159,7 @@ end = struct
            
                  
            fun nodeToTemp (node) = 
-             case List.find (fn (k,v) => Graph.eq node v )(IntBinaryMap.listItemsi(!nodeTracker)) of
+             case List.find (fn (k,v) => Graph.eq(node, v))(IntBinaryMap.listItemsi(!nodeTracker)) of
                 SOME (temp, _) => temp
                 | NONE         => (ErrorMsg.error 0 "Error in nodeToTemp" ; Temp.newtemp()) 
           
@@ -175,17 +175,17 @@ end = struct
                        val defList = case Graph.Table.look (def, node) of SOME dl => dl
                        val useList = case Graph.Table.look (use, node) of SOME ul => ul
                        (* get live temps *)
-                       val (liveTable, liveList) = Graph.Table.look (liveOutMap, node)                         
+                       val (liveTable, liveList) = case Graph.Table.look (liveOutMap, node) of SOME t => t
                     in
                         (* make edges between def and live temps*)
                         (* before making edges check if the node is already present in the igraph for that temp*)
                         (* if not make a node *) 
-                      List.app ( ( fn d =>  
+                      List.app ( (fn d =>
                                       List.app ((fn l =>
                                                     if d = l then ()
                                                     else Graph.mk_edge {from= tempToNode d , to =  tempToNode l }) ,
-                                                liveList), 
-                                 defList));
+                                                liveList)),
+                                 defList);
                       (* adding tuples to moves datastructure *)
                       case Graph.Table.look(ismove, node) of
                          SOME b => (if b then
