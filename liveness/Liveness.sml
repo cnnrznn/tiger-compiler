@@ -107,8 +107,8 @@ end = struct
                  fun extractLiveSetTab(map)=
                      List.foldr (fn ((tempTab, tempList), l) => tempTab :: l) [] (IntBinaryMap.listItems(map1))
 
-                 val livesetTab1 =  extractLiveSetTab (map1);
-                 val livesetTab2 =  extractLiveSetTab (map2);
+                 val livesetTab1 =  extractLiveSetTab (map1)
+                 val livesetTab2 =  extractLiveSetTab (map2)
               in
                   ListPair.allEq (fn (tab1, tab2) => 
                                      let val keyList1 = List.foldr (fn ((k,v), l) => k::l ) [] (IntBinaryMap.listItemsi(tab1))  
@@ -195,7 +195,9 @@ end = struct
                     end
              in
                  List.app addEdges nodes;
-                 IGRAPH {graph = graph, tnode = tempToNode, gtemp= nodeToTemp, moves = !moves }
+                 (IGRAPH {graph = graph, tnode = tempToNode, gtemp= nodeToTemp, moves = !moves },
+                 fn n => case Graph.Table.look(liveOutMap, n)
+                          of SOME (_, templist) => templist)
                  
              end
            
