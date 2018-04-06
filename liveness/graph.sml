@@ -1,4 +1,4 @@
-structure Graph :> GRAPH =
+structure Graph =
 struct
   type node' = int
   type temp = Temp.temp
