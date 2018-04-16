@@ -23,21 +23,13 @@ structure Color : COLOR = struct
                                    else if a < b then
                                        LESS
                                    else  GREATER )
-    
-    structure NodeTupleSet = ListSetFn(
-       type ord_key = Graph.node * Graph.node
-       fun compare (n1, n2) = 
-                                   if a=b then
-                                       EQUAL
-                                   else if a < b then
-                                       LESS
-                                   else  GREATER )
+   
 
     structure Frame = MipsFrame
     type allocation = Frame.register Temp.Table.table
    
    
-    fun color (Liveness.IGRAPH{graph, tnode, gTemp, moves} , initPre , spillCost, registers ) =
+    fun color (Liveness.IGRAPH{graph = graph, tnode =tnode, gtemp= gTemp, moves=  moves} , initPre , spillCost, registers ) =
     let
         (* all the workslists *)
         val simplifyWorkList = ref NodeSet.empty
@@ -50,11 +42,13 @@ structure Color : COLOR = struct
         val spilledNodes = ref NodeSet.empty
         val selectStack : Graph.node list ref = ref []
 
+        fun degreeof (node) =
+            List.length (Graph.adj(node))   
+
         val degree = List.foldr (fn (n, t)  => ref ( Graph.Table.enter (!t, n, degreeof n )) ) (ref Graph.Table.empty) (Graph.nodes graph)
         val color = ref Graph.Table.empty
      
-        fun degreeof (node) =
-            List.length (Graph.adj(node))     
+          
   
         fun build() =
             ( List.app  ( fn (t,r)  =>  let 
@@ -88,7 +82,7 @@ structure Color : COLOR = struct
                                  spillWorkList := NodeSet.add(!spillWorkList, node)
                              else
                                  simplifyWorkList := NodeSet.add(!simplifyWorkList, node)
-                  |NONE =>  (ErrorMsg.error 0 "Error in makeWorkList" ; INT 0)
+                  |NONE =>  (ErrorMsg.error 0 "Error in makeWorkList" ; ())
               
             end
            | makeWorkList([]) = ()
@@ -97,7 +91,7 @@ structure Color : COLOR = struct
             let 
                 val deg = case Graph.Table.look (!degree, node) of
                         SOME d => d
-                        |NONE  => (ErrorMsg.error 0 "Error in decrementdegree" ; INT 0)
+                        |NONE  => (ErrorMsg.error 0 "Error in decrementdegree" ;  0)
                 val k = List.length registers
                  
             in
