@@ -22,8 +22,8 @@ end = struct
                                                    ismove= Graph.Table.enter(#ismove fg, n, false)})
                 | A.LABEL{assem=_, lab=lab} =>
                         populateFG(instrs, nodes, {control= #control fg,
-                                                   def= #def fg,
-                                                   use= #use fg,
+                                                   def= Graph.Table.enter(#def fg, n, []),
+                                                   use= Graph.Table.enter(#use fg, n, []),
                                                    ismove= Graph.Table.enter(#ismove fg, n, false)})
                 | A.MOVE {assem=_, src=src, dst=dst} =>
                         populateFG(instrs, nodes, {control= #control fg,
@@ -58,6 +58,9 @@ end = struct
                  ;
                createEdges(instrs, nodes, iinstrs, nnodes, fg))
 
+    fun printNodes(nodes)=
+       List.app (fn (n) => ErrorMsg.error 0 (Graph.nodename n)) nodes
+
     fun instrs2graph instrs =
         let val fg: Flow.flowgraph = {
                                 control = Graph.newGraph(),
@@ -67,6 +70,7 @@ end = struct
             val nodes = createNodes(instrs, #control fg)
             val newFg = populateFG(instrs, nodes, fg)
         in createEdges(instrs, nodes, instrs, nodes, newFg);
+           (*printNodes(nodes); *)
            (newFg, nodes)
         end
 end

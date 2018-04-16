@@ -29,7 +29,7 @@ end = struct
 	      initializeMaps(nodes, newInMap, newOutMap )
           end
         
-        | initializeMaps([], liveInMap, liveOutMap ) = {liveInMap = liveInMap, liveOutMap = liveOutMap}
+        | initializeMaps([], liveInMap, liveOutMap ) =  {liveInMap = liveInMap, liveOutMap = liveOutMap}
         
 
     (* function to perform liveness analysis given a control flow graph *)
@@ -48,20 +48,24 @@ end = struct
 
             fun liveInMapUpdate(node,liveInMap, liveOutMap) =
                 let
+                    
 		    val (inTable, inList) = case Graph.Table.look (liveInMap, node) of
-                                            SOME u => u
+                                            SOME i => i
+                   
                     val (_, outList) = case Graph.Table.look (liveOutMap, node) of
-                                              SOME u => u
+                                              SOME p => p
                     val useList = case Graph.Table.look (use, node) of
                                    SOME u => u
+                   
           	    val defList =  case Graph.Table.look (def, node) of
-                                   SOME d => d
+                                   SOME dd => dd
                     val filterOut = List.filter
               			(fn t => 
                                  case ( List.find (fn d => t = d) defList)
                                  of SOME e => false
                                    | NONE =>  true) outList
                    val liveIn = useList @ filterOut 
+                   
                    (*doubt : is it a new temptable coz we are assigning live-in or is it adding just entering to table *)
                    val inTable_new = List.foldr (fn (k, t') => Temp.Table.enter (t', k, ())) inTable liveIn;
                    val inList_new = List.foldr (fn ((k,v), l) => k::l ) [] (IntBinaryMap.listItemsi(inTable_new));
@@ -105,9 +109,10 @@ end = struct
             fun isEqual(map1, map2) =
               let
                  fun extractLiveSetTab(map)=
-                     List.foldr (fn ((tempTab, tempList), l) => tempTab :: l) [] (IntBinaryMap.listItems(map1))
+                     List.foldr (fn ((tempTab, tempList): liveSet , l) => tempTab :: l) [] (IntBinaryMap.listItems(map : liveMap))
 
                  val livesetTab1 =  extractLiveSetTab (map1)
+ 
                  val livesetTab2 =  extractLiveSetTab (map2)
               in
                   ListPair.allEq (fn (tab1, tab2) => 
@@ -139,11 +144,11 @@ end = struct
         end
 
     (* function which performs liveness analysis and  builds the interference graph for all the temps *)
-    fun interferenceGraph ({ control, def, use, ismove }: Flow.flowgraph) =
+    fun interferenceGraph ({control, def, use, ismove }: Flow.flowgraph) =
         let
 
            (* perform liveness analysis and get live-in and live-out maps *)
-           val (liveInMap, liveOutMap) = calcLiveness({ control=control, def=def, use=use, ismove=ismove }: Flow.flowgraph)
+           val (liveInMap, liveOutMap) = calcLiveness( { control=control, def=def, use=use, ismove=ismove }: Flow.flowgraph)
            (* initialize the graph *)
            val graph = Graph.newGraph ()
            (* a table to keep track of the temp-> node mapping *)
