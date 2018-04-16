@@ -71,10 +71,10 @@ structure MipsGen : CODEGEN = struct
                 emit( A.OPER {assem="jr `s0\n", src=[munchExp e], dst=[], jump=SOME(lablist)})
            
            | munchStm (T.CJUMP(relop, e, T.CONST 0, l1, l2)) =
-            	emit(A.OPER{assem= (toMipsStr_z relop) ^ " `s0, `j0\nb `j1", dst=[],src=[munchExp e ],jump=SOME [l1,l2]}) (* should we add this case at all *)
+            	emit(A.OPER{assem= (toMipsStr_z relop) ^ " `s0, `j0\nb `j1 \n", dst=[],src=[munchExp e ],jump=SOME [l1,l2]}) (* should we add this case at all *)
 
            | munchStm(T.CJUMP(relop, e1, e2, l1, l2)) = 
-		emit(A.OPER {assem= (toMipsStr relop) ^ "`s0, `s1, `j0 \n b `j1", src=[munchExp e1, munchExp e2], dst=[], jump=SOME [l1, l2]})
+		emit(A.OPER {assem= (toMipsStr relop) ^ "`s0, `s1, `j0 \n b `j1 \n", src=[munchExp e1, munchExp e2], dst=[], jump=SOME [l1, l2]})
 
            | munchStm(T.EXP (T.CALL(T.NAME (n), args))) =
                 let
@@ -95,7 +95,7 @@ structure MipsGen : CODEGEN = struct
 		result(fn r => emit(A.OPER{ assem="lw `d0, " ^ Int.toString i ^ "\n", src=[] , dst=[r] , jump=NONE}))
 
            | munchExp (T.MEM e) =
-            	result(fn r => emit(A.OPER{ assem="lw `d0, 0(`s0)", src=[munchExp e] , dst=[r] , jump=NONE}))
+            	result(fn r => emit(A.OPER{ assem="lw `d0, 0(`s0) \n", src=[munchExp e] , dst=[r] , jump=NONE}))
 	   
             (* arithmetic expressions *)
 

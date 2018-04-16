@@ -7,7 +7,7 @@ sig
 		   moves: (Graph.node * Graph.node) list }
     val interferenceGraph :
         Flow.flowgraph -> igraph * (Graph.node -> Temp.temp list)
-    (*val show : outstream * igraph -> unit *)
+    (*val show : outstream * igraph -> unit *) 
 end = struct
  
     (* interference graph datastructure *)
@@ -169,6 +169,12 @@ end = struct
                 | NONE         => (ErrorMsg.error 0 "Error in nodeToTemp" ; Temp.newtemp()) 
           
            (* Show graph needs to be implemented *)
+          fun show (out, IGRAPH { graph, tnode, gtemp, moves }) =
+            List.app
+            ( fn node =>
+               TextIO.output ( out , Graph.nodename node ^ " : " ^ (List.foldr (fn (n, s) => Graph.nodename n ^ "," ^ s) "" (Graph.adj node)))
+            ) (Graph.nodes graph)           
+
 
            (* function to construct the interference graph   *)
            fun constructGraph(nodes) =
@@ -181,22 +187,35 @@ end = struct
                        val useList = case Graph.Table.look (use, node) of SOME ul => ul
                        (* get live temps *)
                        val (liveTable, liveList) = case Graph.Table.look (liveOutMap, node) of SOME t => t
+                       (* variable to check if current node is a move node *)
+                       val liveList =  case Graph.Table.look(ismove, node) of
+                                           SOME b => if b then
+                                                          (* adding tuples to moves datastructure *) 
+                                                          ( moves := (tempToNode (List.hd useList), tempToNode (List.hd defList) ) :: !moves;
+                                                            List.filter (fn t => 
+                                                                           case ( List.find (fn d => t = d) useList)
+                                                                           of SOME e => false
+                                                                            | NONE =>  true) liveList 
+                                                          )
+                                                      else liveList
+                                           |NONE => (ErrorMsg.error 0 "Catastrophic error in addEgdes " ; liveList)
                     in
                         (* make edges between def and live temps*)
                         (* before making edges check if the node is already present in the igraph for that temp*)
                         (* if not make a node *) 
-                      (List.app (fn d =>
+                      
+                       List.app (fn d =>
                                       List.app (fn l =>
                                                     if d = l then ()
                                                     else Graph.mk_edge {from= tempToNode d , to =  tempToNode l })
                                                 liveList)
-                                 defList;
-                      (* adding tuples to moves datastructure *)
+                                 defList
+                      (* adding tuples to moves datastructure 
                       case Graph.Table.look(ismove, node) of
                          SOME b => (if b then
                                       moves := (tempToNode (List.hd useList), tempToNode (List.hd defList) ) :: !moves
                                    else () )
-                         |NONE => ErrorMsg.error 0 "Catastrophic error in addEgdes ")
+                         |NONE => ErrorMsg.error 0 "Catastrophic error in addEgdes " *)
                     end
              in
                  List.app addEdges nodes;

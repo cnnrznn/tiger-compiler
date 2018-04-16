@@ -54,6 +54,7 @@ sig
         val calleesaves : Temp.temp list   
        
         val tempMap : register Temp.Table.table
+        val registers : register list
         val makeString : Temp.temp -> register
         val string: Temp.label * string -> string
 
