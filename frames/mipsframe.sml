@@ -69,6 +69,8 @@ struct
           in  
              List.foldr enterTable Temp.Table.empty regList
           end
+        
+        val registers = IntBinaryMap.listItems(tempMap)
 
         fun makeString temp =
           case Temp.Table.look (tempMap, temp) of
