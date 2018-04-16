@@ -1,7 +1,7 @@
 signature COLOR =
 sig 
     structure Frame: FRAME
-    val allocation : Frame.register Temp.Table.table
+    type allocation
     val color : { interference : Liveness.igraph,
                   initial : allocation,
                   spillCost : Graph.node -> int,
@@ -29,7 +29,7 @@ structure Color : COLOR = struct
     type allocation = Frame.register Temp.Table.table
    
    
-    fun color (Liveness.IGRAPH{graph = graph, tnode =tnode, gtemp= gTemp, moves=  moves} , initPre , spillCost, registers ) =
+    fun color ({ interference = Liveness.IGRAPH{graph = graph, tnode =tnode, gtemp= gTemp, moves=  moves} , initial = initPre , spillCost = spillCost, registers = registers} ) =
     let
         (* all the workslists *)
         val simplifyWorkList = ref NodeSet.empty
@@ -46,7 +46,7 @@ structure Color : COLOR = struct
             List.length (Graph.adj(node))   
 
         val degree = List.foldr (fn (n, t)  => ref ( Graph.Table.enter (!t, n, degreeof n )) ) (ref Graph.Table.empty) (Graph.nodes graph)
-        val color = ref Graph.Table.empty
+        val color : allocation ref = ref Temp.Table.empty
      
           
   
@@ -55,7 +55,7 @@ structure Color : COLOR = struct
                                            val n : Graph.node  = tnode t
                                         in  
                                            ( precoloredNodes := NodeSet.add(!precoloredNodes, n) ;
-                                            color := Graph.Table.enter(!color, n,r) )
+                                            color := Temp.Table.enter(!color, t,r) )
                                         end )  ( IntBinaryMap.listItemsi(initPre) ) ; 
 
        
@@ -103,18 +103,17 @@ structure Color : COLOR = struct
             end
            
         
-        fun simplify(node :: nodes) =
+        fun simplify() =
            let
+              
+               val node = List.hd ( NodeSet.listItems(!simplifyWorkList))
                val adjnodes = Graph.adj(node)
            in
-              (simplifyWorkList := NodeSet.delete(!simplifyWorkList, node);
-               selectStack := node :: !selectStack;
-               List.app (fn n => decrementDegree n) adjnodes ;
-               simplify(nodes) )
-           end
-            
-            | simplify ([]) = ()
-            
+                    (simplifyWorkList := NodeSet.delete(!simplifyWorkList, node);
+                     selectStack := node :: !selectStack;
+                     List.app (fn n => decrementDegree n) adjnodes )
+           end 
+                       
            
        fun assignColors(node) =
            let 
@@ -124,7 +123,7 @@ structure Color : COLOR = struct
            in
               let
                   val remColors = List.foldr (fn (a,c) => if NodeSet.member(u, a) then
-                                                             case Graph.Table.look(!color, a) of
+                                                             case Temp.Table.look(!color, (gTemp a)) of
                                                                  SOME colr => RegSet.delete(c, colr)
                                                                 |NONE => (ErrorMsg.error 0 "Error in assignColors" ; c)
                                                               
@@ -135,20 +134,47 @@ structure Color : COLOR = struct
                       spilledNodes := NodeSet.add(!spilledNodes, node)
                   else
                       coloredNodes := NodeSet.add(!coloredNodes, node) ;
-                      color := Graph.Table.enter(!color, node, List.hd (RegSet.listItems(okColors)))
+                      color := Temp.Table.enter(!color, (gTemp node), List.hd (RegSet.listItems(okColors)))
               end
              
            end
-                 
-     
+        
+       fun selectSpill() =
+           let
+               fun chooseSpill(minNode, node::nodes) = 
+                 ( let val cost1 = spillCost minNode
+                       val cost2 = spillCost node
+                   in
+                       if cost1 < cost2 then
+                           chooseSpill(minNode, nodes)
+                       else
+                           chooseSpill(node, nodes) 
+                       end)
+                     
+                  | chooseSpill(minNode, []) = minNode
+                      
+                val spillNode = chooseSpill(List.hd (NodeSet.listItems(!spillWorkList)), NodeSet.listItems(!spillWorkList))
+            in
+                spillWorkList := NodeSet.delete(!spillWorkList, spillNode);
+                simplifyWorkList := NodeSet.add(!simplifyWorkList, spillNode)  
+                (* freeze MOves *)                    
+                   
+           end
+
+            
+       fun repeatFunc() =
+          if not (NodeSet.isEmpty(!simplifyWorkList)) then 
+             (simplify(); repeatFunc())
+          else if not (NodeSet.isEmpty(!spillWorkList) ) then 
+              (selectSpill() ; repeatFunc())
+          else ()
     in
        build();
        makeWorkList(NodeSet.listItems(!initial));
-       simplify(NodeSet.listItems(!simplifyWorkList));
-       List.app (fn (n) => assignColors(n)) (Graph.nodes graph)
-
+       repeatFunc();
+       List.app (fn (n) => assignColors(n)) (Graph.nodes graph);
        
-        
+       ( !color ,  List.map (fn (n) => gTemp n) (NodeSet.listItems(!spilledNodes)) )
     end
             
 end
