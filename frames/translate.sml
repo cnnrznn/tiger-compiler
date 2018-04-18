@@ -49,6 +49,7 @@ sig
         val errorTree: int -> exp
 
         val printTree: exp -> unit
+        val printTreeSTM: Tree.stm -> unit
 end
 
 structure Translate : TRANSLATE =
@@ -165,6 +166,7 @@ struct
         (* HELPER FUNCTIONS                             *)
 
         fun printTree(t: exp) = Printtree.printtree(TextIO.stdOut, unNx(t))
+        fun printTreeSTM(t: Tree.stm) = Printtree.printtree(TextIO.stdOut, t)
 
         fun prepend(explist: exp list, exp: exp) =
                 let val ex = unEx(exp)
@@ -180,9 +182,14 @@ struct
         fun errorTree(n: int) = Ex(T.MEM(T.CONST n))
 
         fun procEntryExit{level: level, bodyExp: exp} =
-                let val body = T.MOVE(T.TEMP Frame.RV, unEx bodyExp)
+                let val label = case Table.look(!HT, level)
+                                 of SOME f => (Frame.name f)
+                                  | NONE => (ErrorMsg.error 0 "could not find level in HT";
+                                             Temp.newlabel())
+                    val body = T.SEQ(T.LABEL label,
+                                     T.MOVE(T.TEMP Frame.RV, unEx bodyExp))
                 in case Table.look(!HT, level)
-                    of NONE => ErrorMsg.error 0 "catastrophic error"
+                    of NONE => ErrorMsg.error 0 "catastrophic error in <procEntryExit>"
                      | SOME f => fragList := Frame.PROC{body=Frame.procEntryExit1(f, body), frame=f} :: !fragList
                 end
 
