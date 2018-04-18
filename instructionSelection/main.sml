@@ -12,16 +12,23 @@ structure Main = struct
 (*         val _ = app (fn s => Printtree.printtree(out,s)) stms; *)
          val stms' = Canon.traceSchedule(Canon.basicBlocks stms)
 	 val instrs =   List.concat(map (MipsGen.codegen frame) stms') 
-        
-         val (instrs, alloc) =  RegAlloc.alloc (instrs, frame)
-         val alloc_list = List.map (fn (k,v) => Temp.makestring k ^" , " ^ v) (IntBinaryMap.listItemsi(alloc))
+
+         val (flowGraph, nodeList) = MakeGraph.instrs2graph instrs
+         val (igraph, _) = Liveness.interferenceGraph flowGraph
+         (*val (instrs, alloc) =  RegAlloc.alloc (instrs, frame)*)
+         (*val alloc_list = List.map (fn (k,v) => Temp.makestring k ^" , " ^ v) (IntBinaryMap.listItemsi(alloc))*)
          val format0 = Assem.format(F.makeString)
-      in (app (fn i => TextIO.output(out,format0 i)) instrs ;
-          TextIO.output (out,  "\n******* register allocation *** \n");
-          app (fn i => TextIO.output(out, i^ "  ")) alloc_list );
-          TextIO.output (out, "\n")
+      in print "==========================================\n";
+         Translate.printTreeSTM body;
+         print "*************************\n";
+         app (fn i => TextIO.output(TextIO.stdOut,format0 i)) instrs;
+         print "==========================================\n\n";
+         app (fn i => TextIO.output(out,format0 i)) instrs
      end
-    | emitproc out (F.STRING(lab,s)) = TextIO.output(out, F.string(lab,s))
+    | emitproc out (F.STRING(lab,s)) = (
+        print ("\temitting string" ^ s);
+        TextIO.output(out, F.string(lab,s))
+        )
 
    fun withOpenFile fname f = 
        let val out = TextIO.openOut fname

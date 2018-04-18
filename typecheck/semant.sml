@@ -542,39 +542,39 @@ and transDecs(tenv, venv, A.VarDec dec::decs, level: Translate.level,
 and transExp(tenv, venv, exp, level: Translate.level,
                 doneLabel: Temp.label option) =
 case exp of
-  A.OpExp opexp =>(     print("transOpExp\n");
+  A.OpExp opexp =>(     (* print("transOpExp\n"); *)
         transOpExp(tenv, venv, A.OpExp opexp, level, doneLabel))
-| A.VarExp var =>(      print("transVarExp\n");
+| A.VarExp var =>(      (* print("transVarExp\n"); *)
         transVarExp(tenv, venv, var, level, doneLabel))
-| A.NilExp =>(          print("transNilExp\n");
+| A.NilExp =>(          (* print("transNilExp\n"); *)
         {exp=Translate.nilExp(), ty=T.NIL})
-| A.IntExp n =>(        print("transIntExp\n");
+| A.IntExp n =>(        (* print("transIntExp\n"); *)
         {exp=Translate.intExp(n), ty=T.INT})
-| A.StringExp(str, p) =>(       print("transStringExp\n");
+| A.StringExp(str, p) =>(       (* print("transStringExp\n"); *)
         {exp=Translate.strExp(str), ty=T.STRING})
-| A.CallExp callexp =>(         print("transCallExp\n");
+| A.CallExp callexp =>(         (* print("transCallExp\n"); *)
         transCallExp(tenv, venv, A.CallExp callexp, level, doneLabel))
-| A.RecordExp recexp =>(        print("transRecordExp\n");
+| A.RecordExp recexp =>(        (* print("transRecordExp\n");*)
         transRecordExp(tenv, venv, A.RecordExp recexp, level, doneLabel))
-| A.SeqExp seqexp =>(           print("transSeqExp\n");
+| A.SeqExp seqexp =>(           (*print("transSeqExp\n");*)
         transSeqExp(tenv, venv, A.SeqExp seqexp, level, doneLabel, []))
-| A.AssignExp assignexp =>(     print("transAssignExp\n");
+| A.AssignExp assignexp =>(     (*print("transAssignExp\n");*)
         transAssignExp(tenv, venv, A.AssignExp assignexp, level, doneLabel))
-| A.IfExp ifexp =>(             print("transIfExp\n");
+| A.IfExp ifexp =>(             (*print("transIfExp\n");*)
         transIfExp(tenv, venv, A.IfExp ifexp, level, doneLabel))
-| A.WhileExp whilexp =>(        print("transWhileExp\n");
+| A.WhileExp whilexp =>(        (*print("transWhileExp\n");*)
         transWhileExp(tenv, venv, A.WhileExp whilexp, level, doneLabel))
-| A.ForExp forexp =>(           print("transForExp\n");
+| A.ForExp forexp =>(           (*print("transForExp\n");*)
         transForExp(tenv, venv, A.ForExp forexp, level, doneLabel))
-| A.BreakExp breakexp =>(       print("transBreakExp\n");
+| A.BreakExp breakexp =>(       (*print("transBreakExp\n");*)
         {exp=Translate.break(doneLabel), ty=actual_ty(transBreakExp(tenv, venv,  A.BreakExp breakexp, level))})
-| A.LetExp {decs, body, pos} =>(print("transLetExp\n");
+| A.LetExp {decs, body, pos} =>((*print("transLetExp\n");*)
         let val ({te=tenv', ve=venv'}, explist: Translate.exp list) =
                         transDecs(tenv, venv, decs, level, [], doneLabel)
             val {exp=exp, ty=ty} = transExp(tenv', venv', body, level, doneLabel)
         in  {exp=Translate.prepend(explist, exp), ty=ty}
         end)
-| A.ArrayExp arrexp =>(         print("transArrayExp\n");
+| A.ArrayExp arrexp =>(         (*print("transArrayExp\n");*)
         transArrayExp(tenv, venv, A.ArrayExp arrexp, level, doneLabel))
 
 (*******************************************************)
@@ -665,11 +665,16 @@ and transProg(exp) =
                 (* find escaping variables *)
                 (*FE.findEscape(exp); *)
 
+                print "===========================================\n";
+                print "AST\n";
+                PrintAbsyn.print(TextIO.stdOut, exp);
+                print "===========================================\n\n";
+
                 (* recurse *)
                 let val {exp=expTree, ty=_} = transExp(tenv, venv, exp, Translate.outermost, NONE)
                 in  
                     
-                    Translate.printTree(expTree);
+                    (*Translate.printTree(expTree);*)
                     Translate.procEntryExit{level=Translate.outermost,
                                             bodyExp=expTree}
                 end;
