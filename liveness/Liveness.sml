@@ -91,6 +91,8 @@ end = struct
                    val outList_new = List.foldr (fn ((k,v), l) => k::l ) [] (IntBinaryMap.listItemsi(outTable_new));
  
                 in
+                     (**** Debugging purposes ****) 
+                    (*ErrorMsg.error 0 ("no .of successors of "^ (Graph.nodename node)^":  "^(Int.toString (List.length(succ_n)))); *)
                     Graph.Table.enter(liveOutMap, node, (outTable_new, outList_new))
                 end 
             
@@ -118,7 +120,15 @@ end = struct
                   ListPair.allEq (fn (tab1, tab2) => 
                                      let val keyList1 = List.foldr (fn ((k,v), l) => k::l ) [] (IntBinaryMap.listItemsi(tab1))  
                                          val keyList2 = List.foldr (fn ((k,v), l) => k::l ) [] (IntBinaryMap.listItemsi(tab2)) 
-                                     in keyList1 = keyList2 
+                                     in 
+                                         (**** Debugging purposes ****) 
+                                         (*let val temps = List.foldr (fn (t,l) => l ^ (Temp.makestring t) ^ " ," ) "" (keyList1)
+                                            in  ErrorMsg.error 0  ( "keylist1 : "^temps)
+                                            end;
+                                          let val temps = List.foldr (fn (t,l) => l ^ (Temp.makestring t) ^ " ," ) "" (keyList2)
+                                            in  ErrorMsg.error 0  ( "Keylist2 : "^temps)
+                                            end; *)
+                                         keyList1 = keyList2 
                                      end) (livesetTab1, livesetTab2)
                   
               end
@@ -131,8 +141,8 @@ end = struct
                     val (liveIn_new, liveOut_new) =   mapUpdate (nodes,liveInMap,liveOutMap )
                 in
                    if ( isEqual (liveInMap,liveIn_new ) andalso isEqual (liveOutMap,liveOut_new )) then
-
-                	(liveIn_new, liveOut_new)
+                       (ErrorMsg.error 0  "live Maps converging" ; 
+                	(liveIn_new, liveOut_new))
             	   else
                 	iterUpdates (nodes, liveIn_new, liveOut_new )
 		    

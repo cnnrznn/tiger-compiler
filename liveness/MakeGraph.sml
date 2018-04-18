@@ -47,16 +47,28 @@ end = struct
                 makeEdges(n, labs, instrs, nodes, g)
                 )
 
-        fun createEdges([], [], _, _, _) = ()
-          | createEdges(i::instrs, n::nodes, iinstrs, nnodes, fg: Flow.flowgraph) =
+        fun createEdges([i],[n], iinstrs, nnodes, fg:Flow.flowgraph) =
               (case i
-                of A.OPER{assem=_, src=_, dst=_, jump=jump} =>
+                    of A.OPER{assem=_, src=_, dst=_, jump=jump} =>
                          (case jump
                           of NONE => ()
                            | SOME labs => makeEdges(n, labs, iinstrs, nnodes, #control fg))
-                 | _ => ()
-                 ;
+                    | _ => ()
+                   )
+              
+          | createEdges(i::instrs, n::nodes, iinstrs, nnodes, fg: Flow.flowgraph) =
+               let
+                  val nextnode::restnodes = nodes                  
+               in
+                   (case i
+                    of A.OPER{assem=_, src=_, dst=_, jump=jump} =>
+                         (case jump
+                          of NONE =>  Graph.mk_edge{from=n, to=nextnode}
+                           | SOME labs => makeEdges(n, labs, iinstrs, nnodes, #control fg))
+                    | _ => Graph.mk_edge{from=n, to=nextnode}
+                   ;
                createEdges(instrs, nodes, iinstrs, nnodes, fg))
+              end
 
     fun printNodes(nodes)=
        List.app (fn (n) => ErrorMsg.error 0 (Graph.nodename n)) nodes
@@ -70,7 +82,7 @@ end = struct
             val nodes = createNodes(instrs, #control fg)
             val newFg = populateFG(instrs, nodes, fg)
         in createEdges(instrs, nodes, instrs, nodes, newFg);
-           (*printNodes(nodes); *)
+           (*printNodes(nodes); *) 
            (newFg, nodes)
         end
 end

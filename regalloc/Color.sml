@@ -48,7 +48,11 @@ structure Color : COLOR = struct
         val degree = List.foldr (fn (n, t)  => ref ( Graph.Table.enter (!t, n, degreeof n )) ) (ref Graph.Table.empty) (Graph.nodes graph)
         val color : allocation ref = ref Temp.Table.empty
      
-          
+        fun printAllocation() =
+           let val alloc_list = List.foldr (fn ((k,v),l) => l ^ "("^ Temp.makestring k ^" , " ^ v ^")\n\n") "" (IntBinaryMap.listItemsi(!color))
+             in ErrorMsg.error 0  alloc_list
+             end 
+       
   
         fun build() =
             ( List.app  ( fn (t,r)  =>  let 
@@ -58,7 +62,7 @@ structure Color : COLOR = struct
                                             color := Temp.Table.enter(!color, t,r) )
                                         end )  ( IntBinaryMap.listItemsi(initPre) ) ; 
 
-       
+             
        
            (* initialize initial structure*)
            List.app ( fn (node) => let 
@@ -77,12 +81,15 @@ structure Color : COLOR = struct
         fun makeWorkList(node::nodes) = 
             let val k = List.length registers
             in 
-              case  Graph.Table.look (!degree, node) of
+             ( case  Graph.Table.look (!degree, node) of
                    SOME d => if d >= k then
                                  spillWorkList := NodeSet.add(!spillWorkList, node)
+                         
                              else
-                                 simplifyWorkList := NodeSet.add(!simplifyWorkList, node)
-                  |NONE =>  (ErrorMsg.error 0 "Error in makeWorkList" ; ())
+                                ( simplifyWorkList := NodeSet.add(!simplifyWorkList, node);
+                                 ())
+                  |NONE =>  (ErrorMsg.error 0 "Error in makeWorkList" ; ()) ;
+                 makeWorkList(nodes))
               
             end
            | makeWorkList([]) = ()
@@ -111,6 +118,9 @@ structure Color : COLOR = struct
            in
                     (simplifyWorkList := NodeSet.delete(!simplifyWorkList, node);
                      selectStack := node :: !selectStack;
+                     (*let val adjList =  List.foldr (fn (t,l) => l ^ (Temp.makestring (gTemp t)) ^ " ," ) "" (adjnodes)
+                      in ErrorMsg.error 0 ("adj nodes of "^(Temp.makestring( (gTemp node)))^" : "^ (adjList))
+                     end;*)
                      List.app (fn n => decrementDegree n) adjnodes )
            end 
                        
@@ -128,13 +138,15 @@ structure Color : COLOR = struct
                                                                 |NONE => (ErrorMsg.error 0 "Error in assignColors" ; c)
                                                               
                                                           else c ) okColors adjlist
-                                                          
+                                                         
               in 
+             
                   if RegSet.isEmpty( remColors) then
                       spilledNodes := NodeSet.add(!spilledNodes, node)
                   else
                       coloredNodes := NodeSet.add(!coloredNodes, node) ;
-                      color := Temp.Table.enter(!color, (gTemp node), List.hd (RegSet.listItems(okColors)))
+                      color := Temp.Table.enter(!color, (gTemp node), List.hd (RegSet.listItems(remColors)))
+                      (*printAllocation()*)
               end
              
            end
@@ -170,10 +182,13 @@ structure Color : COLOR = struct
           else ()
     in
        build();
+       (*ErrorMsg.error 0 (Int.toString( NodeSet.numItems(!initial)));*)
        makeWorkList(NodeSet.listItems(!initial));
+       (*ErrorMsg.error 0 (Int.toString( NodeSet.numItems(!simplifyWorkList))); *) 
        repeatFunc();
-       List.app (fn (n) => assignColors(n)) (Graph.nodes graph);
-       
+      
+       List.app (fn (n) => assignColors(n)) (!selectStack);
+       (*ErrorMsg.error 0 ("number of spilled nodes " ^ Int.toString( NodeSet.numItems(!spilledNodes))); *)
        ( !color ,  List.map (fn (n) => gTemp n) (NodeSet.listItems(!spilledNodes)) )
     end
             
