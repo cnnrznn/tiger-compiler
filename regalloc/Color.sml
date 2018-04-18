@@ -51,7 +51,7 @@ structure Color : COLOR = struct
         val simplifyWorkList = ref NodeSet.empty
         val spillWorkList = ref NodeSet.empty
         val moveWorkList = ref MoveSet.empty
-        val moveList = ref Graph.Table.empty
+        val moveList: MoveSet.set Graph.Table.table ref = ref Graph.Table.empty
         val coalescedNodes = ref NodeSet.empty
         val alias = ref Graph.Table.empty
         val freezeWorkList = ref NodeSet.empty
@@ -97,10 +97,24 @@ structure Color : COLOR = struct
                                       case Temp.Table.look(initPre, t) of
                                           SOME reg => coloredNodes :=  NodeSet.add(!coloredNodes, node) 
                                           | NONE  =>  initial := NodeSet.add(!initial, node)
-                                   end )  (Graph.nodes graph) )
+                                   end )  (Graph.nodes graph) ;
        
            (* make the moveList Table *)
-           (* List.app (fn ( (n1,n2), t) => (t := Temp.Table.enter (!t, n1, n2); t := Temp.Table.enter (!t, n2, n1) )) moveList moves ) *)
+           List.app (fn (n1,n2) => (let val s1 = case Graph.Table.look(!moveList, n1)
+                                                  of SOME set => set
+                                                   | NONE => MoveSet.empty
+                                        val s2 = case Graph.Table.look(!moveList, n2)
+                                                  of SOME set => set
+                                                   | NONE =>MoveSet.empty
+                                        val ns1 = MoveSet.add(s1, (n1, n2))
+                                        val ns2 = MoveSet.add(s2, (n1, n2))
+                                    in moveList := Graph.Table.enter(!moveList, n1, ns1);
+                                       moveList := Graph.Table.enter(!moveList, n2, ns2)
+                                    end
+                                )
+                    )
+                    moves
+                )
 
         fun makeMoveWorkList([]) = ()
           | makeMoveWorkList(m::moves) = (
@@ -254,7 +268,18 @@ structure Color : COLOR = struct
 
                    coalescedNodes := NodeSet.add(!coalescedNodes, v);
                    alias := Graph.Table.enter(!alias, v, u);
-                   moveList := Graph.Table.enter(!moveList, u, ml);
+
+                   let val set1 = case Graph.Table.look(!moveList, u)
+                                  of SOME s => s
+                                   | NONE => (ErrorMsg.error 0 "catastrophic in <Combine>";
+                                              MoveSet.empty)
+                       val set2 = case Graph.Table.look(!moveList, v)
+                                  of SOME s => s
+                                   | NONE => (ErrorMsg.error 0 "catastrophic in <Combine>";
+                                              MoveSet.empty)
+                   in moveList := Graph.Table.enter(!moveList, u, MoveSet.union(set1, set2))
+                   end;
+
                    List.app combineEdges (NodeSet.listItems(Adjacent(v)));
                    if deg >= K andalso (NodeSet.member(!freezeWorkList, u)) then
                         (freezeWorkList := NodeSet.delete(!freezeWorkList, u);
