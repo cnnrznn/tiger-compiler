@@ -24,6 +24,20 @@ structure Color : COLOR = struct
                                        LESS
                                    else  GREATER )
    
+        structure MoveSet = ListSetFn(
+                type ord_key = Graph.node * Graph.node
+                fun compare (((_, a), (_, b)), ((_, c), (_, d))) = (
+                        if a = c then
+                                if b = d then
+                                        EQUAL
+                                else if b < d then
+                                        LESS
+                                else    GREATER
+                        else if a < c then
+                                LESS
+                        else    GREATER
+                )
+        )
 
     structure Frame = MipsFrame
     type allocation = Frame.register Temp.Table.table
@@ -31,16 +45,32 @@ structure Color : COLOR = struct
    
     fun color ({ interference = Liveness.IGRAPH{graph = graph, tnode =tnode, gtemp= gTemp, moves=  moves} , initial = initPre , spillCost = spillCost, registers = registers} ) =
     let
+        val K = 32
+
         (* all the workslists *)
         val simplifyWorkList = ref NodeSet.empty
         val spillWorkList = ref NodeSet.empty
-        val moveWorkList = ref NodeSet.empty 
-        val moveList = ref Graph.Table.empty
+        val moveWorkList = ref MoveSet.empty
+        val moveList: MoveSet.set Graph.Table.table ref = ref Graph.Table.empty
+        val coalescedNodes = ref NodeSet.empty
+        val alias = ref Graph.Table.empty
+        val freezeWorkList = ref NodeSet.empty
         val coloredNodes = ref NodeSet.empty
         val precoloredNodes = ref NodeSet.empty
         val initial = ref NodeSet.empty
         val spilledNodes = ref NodeSet.empty
         val selectStack : Graph.node list ref = ref []
+
+        val activeMoves = ref MoveSet.empty
+        val frozenMoves = ref MoveSet.empty
+        val coalescedMoves = ref MoveSet.empty
+        val constrainedMoves = ref MoveSet.empty
+
+        fun adjSet(u, v) =
+                let val adj = Graph.adj u
+                    fun findNode(t) = Graph.eq(t, v)
+                in List.exists findNode adj
+                end
 
         fun degreeof (node) =
             List.length (Graph.adj(node))   
@@ -71,11 +101,47 @@ structure Color : COLOR = struct
                                       case Temp.Table.look(initPre, t) of
                                           SOME reg => coloredNodes :=  NodeSet.add(!coloredNodes, node) 
                                           | NONE  =>  initial := NodeSet.add(!initial, node)
-                                   end )  (Graph.nodes graph) )
+                                   end )  (Graph.nodes graph) ;
        
            (* make the moveList Table *)
-           (* List.app (fn ( (n1,n2), t) => (t := Temp.Table.enter (!t, n1, n2); t := Temp.Table.enter (!t, n2, n1) )) moveList moves ) *)
+           List.app (fn (n1,n2) => (let val s1 = case Graph.Table.look(!moveList, n1)
+                                                  of SOME set => set
+                                                   | NONE => MoveSet.empty
+                                        val s2 = case Graph.Table.look(!moveList, n2)
+                                                  of SOME set => set
+                                                   | NONE =>MoveSet.empty
+                                        val ns1 = MoveSet.add(s1, (n1, n2))
+                                        val ns2 = MoveSet.add(s2, (n1, n2))
+                                    in moveList := Graph.Table.enter(!moveList, n1, ns1);
+                                       moveList := Graph.Table.enter(!moveList, n2, ns2)
+                                    end
+                                )
+                    )
+                    moves
+                )
 
+        fun makeMoveWorkList([]) = ()
+          | makeMoveWorkList(m::moves) = (
+                moveWorkList := MoveSet.add(!moveWorkList, m);
+                makeMoveWorkList(moves)
+                )
+
+        fun NodeMoves(n) =
+                let val mln = case Graph.Table.look(!moveList, n)
+                               of SOME set => set
+                                | NONE => (ErrorMsg.error 0 "fatal in <MoveRelated()>";
+                                                MoveSet.empty)
+                in
+                   MoveSet.intersection(
+                           mln,
+                           MoveSet.union(
+                                   !activeMoves,
+                                   !moveWorkList
+                           )
+                   )
+                end
+
+        fun MoveRelated(n) = MoveSet.isEmpty(NodeMoves(n))
 
 
         fun makeWorkList(node::nodes) = 
@@ -94,18 +160,182 @@ structure Color : COLOR = struct
             end
            | makeWorkList([]) = ()
 
-        fun decrementDegree(node) =
+        fun Adjacent(n) =
+                (* adjList[n].difference(selectStack U coalescedNodes) *)
+                let val adj = NodeSet.addList(NodeSet.empty,
+                                                Graph.adj n)
+                    val set = NodeSet.union(NodeSet.addList(NodeSet.empty, !selectStack),
+                                            !coalescedNodes)
+                in  NodeSet.difference(adj, set)
+                end
+
+        fun EnableMoves([]) = ()
+        fun EnableMoves(n::nodes) =
+                let fun forEachMove([]) = ()
+                    fun forEachMove(m::moves) =
+                        if MoveSet.member(!activeMoves, m) then
+                                (activeMoves := MoveSet.delete(!activeMoves, m);
+                                moveWorkList := MoveSet.add(!moveWorkList, m))
+                        else ()
+                in
+                    forEachMove(MoveSet.listItems(NodeMoves(n)));
+                    EnableMoves(nodes)
+                end
+
+        fun Coalesce() =
+                let val (x',y') = List.hd(MoveSet.listItems(!moveWorkList))
+                    val m = (x', y')
+                    val x = GetAlias(x')
+                    val y = GetAlias(y')
+                    val (u, v) = if NodeSet.member(!precoloredNodes, y) then
+                                        (y, x)
+                                 else   (x, y)
+                in moveWorkList := MoveSet.delete(!moveWorkList, m);
+                   if Graph.eq(u, v) then
+                        (coalescedMoves := MoveSet.add(!coalescedMoves, m);
+                        AddWorkList(u))
+                   else if NodeSet.member(!precoloredNodes, v) orelse adjSet(u, v) then
+                        (constrainedMoves := MoveSet.add(!constrainedMoves, m);
+                        AddWorkList(u);
+                        AddWorkList(v))
+                   else if ((NodeSet.member(!precoloredNodes, u) andalso
+                                allOK(NodeSet.listItems(Adjacent(v)), u)) orelse
+                                (not(NodeSet.member(!precoloredNodes, u)) andalso
+                                Conservative(NodeSet.listItems(NodeSet.union(Adjacent(u), Adjacent(v)))))) then
+                        (coalescedMoves := MoveSet.add(!coalescedMoves, m);
+                        Combine(u, v);
+                        AddWorkList(u))
+                   else
+                        activeMoves := MoveSet.add(!activeMoves, m)
+                end
+
+        and AddWorkList(u) =
+                if not(NodeSet.member(!precoloredNodes, u)) andalso not(MoveRelated(u))
+                                 then
+                        (freezeWorkList := NodeSet.delete(!freezeWorkList, u);
+                        simplifyWorkList := NodeSet.add(!simplifyWorkList, u))
+                else ()
+
+        and allOK(nodes, u) =
+                List.all (fn t => OK(t, u)) 
+                         nodes
+
+        and OK (t: Graph.node, r: Graph.node) =
+                let val deg = case Graph.Table.look(!degree, t)
+                                of SOME d => d
+                                 | NONE => (ErrorMsg.error 0 "catastrophic in <OK()>";
+                                            0)
+                in ((deg < K) orelse NodeSet.member(!precoloredNodes, t) orelse
+                                adjSet(t, r))
+                end
+
+        and Conservative(nodes) =
+                let
+                    fun highDeg([], k) = k
+                      | highDeg(n::nodes, k) =
+                        let val deg = case Graph.Table.look(!degree, n)
+                                        of SOME d => d
+                                         | NONE => (ErrorMsg.error 0 "catastrophic in <Conservative()>";
+                                                    0)
+                        in if deg >= K then
+                                highDeg(nodes, k + 1)
+                           else highDeg(nodes, k)
+                        end
+                    val k = highDeg(nodes, 0)
+                in k < K
+                end
+
+        and GetAlias(n) =
+                if NodeSet.member(!coalescedNodes, n) then
+                        let val m = case Graph.Table.look(!alias, n)
+                                     of SOME u => u
+                                      | NONE => (ErrorMsg.error 0 "catastrophic in <GetAlias()>";
+                                                 n)
+                        in GetAlias(m)
+                        end
+                else n
+
+        and Combine(u, v) =
+                let val ml = case Graph.Table.look(!moveList, v)
+                              of SOME l => l
+                               | NONE => (ErrorMsg.error 0 "catastrophic in <Combine>";
+                                      MoveSet.empty)
+                    fun combineEdges(t) = (
+                        AddEdge(t, u);
+                        DecrementDegree(t)
+                        )
+                    val deg = case Graph.Table.look(!degree, u)
+                                of SOME d => d
+                                 | NONE => (ErrorMsg.error 0 "catastrophic in <OK()>";
+                                            0)
+                in if NodeSet.member(!freezeWorkList, v) then
+                           freezeWorkList := NodeSet.delete(!freezeWorkList, v)
+                   else
+                        spillWorkList := NodeSet.delete(!spillWorkList, v);
+
+                   coalescedNodes := NodeSet.add(!coalescedNodes, v);
+                   alias := Graph.Table.enter(!alias, v, u);
+
+                   let val set1 = case Graph.Table.look(!moveList, u)
+                                  of SOME s => s
+                                   | NONE => (ErrorMsg.error 0 "catastrophic in <Combine>";
+                                              MoveSet.empty)
+                       val set2 = case Graph.Table.look(!moveList, v)
+                                  of SOME s => s
+                                   | NONE => (ErrorMsg.error 0 "catastrophic in <Combine>";
+                                              MoveSet.empty)
+                   in moveList := Graph.Table.enter(!moveList, u, MoveSet.union(set1, set2))
+                   end;
+
+                   List.app combineEdges (NodeSet.listItems(Adjacent(v)));
+                   if deg >= K andalso (NodeSet.member(!freezeWorkList, u)) then
+                        (freezeWorkList := NodeSet.delete(!freezeWorkList, u);
+                        spillWorkList := NodeSet.add(!spillWorkList, u))
+                   else ()
+                end
+
+        and Freeze() =
+                let val u = List.hd(NodeSet.listItems(!freezeWorkList))
+                in freezeWorkList := NodeSet.delete(!freezeWorkList, u);
+                   simplifyWorkList := NodeSet.add(!simplifyWorkList, u);
+                   FreezeMoves(u)
+                end
+
+        and FreezeMoves(u : Graph.node) =
+                let fun forAllMoves(m) =
+                        let val (x, y) = m
+                            val v = if Graph.eq(GetAlias(u), GetAlias(y))then
+                                         GetAlias(x)
+                                    else GetAlias(y)
+                            val deg = case Graph.Table.look (!degree, v) of
+                               SOME d => d
+                               |NONE  => (ErrorMsg.error 0 "Error in freezeMoves" ;  0)
+                        in activeMoves := MoveSet.delete(!activeMoves, m);
+                           frozenMoves := MoveSet.add(!frozenMoves, m);
+                           if MoveSet.isEmpty(NodeMoves(v)) andalso deg < K then
+                                (freezeWorkList := NodeSet.delete(!freezeWorkList, v);
+                                simplifyWorkList := NodeSet.add(!simplifyWorkList, v))
+                           else ()
+                        end
+                in List.app forAllMoves (MoveSet.listItems(NodeMoves(u)))
+                end
+
+        and DecrementDegree(node) =
             let 
                 val deg = case Graph.Table.look (!degree, node) of
                         SOME d => d
-                        |NONE  => (ErrorMsg.error 0 "Error in decrementdegree" ;  0)
+                        |NONE  => (ErrorMsg.error 0 "Error in Decrementdegree" ;  0)
                 val k = List.length registers
                  
             in
               degree := Graph.Table.enter(!degree, node, (deg-1)) ;
               if deg = k then
-                  (spillWorkList := NodeSet.delete(!spillWorkList, node);
-                   simplifyWorkList := NodeSet.add(!simplifyWorkList, node) )
+                  (EnableMoves(node :: NodeSet.listItems(Adjacent(node)));
+                   spillWorkList := NodeSet.delete(!spillWorkList, node);
+                   if MoveRelated(node) then
+                         freezeWorkList := NodeSet.add(!freezeWorkList, node)
+                   else
+                         simplifyWorkList := NodeSet.add(!simplifyWorkList, node) )
               else ()
             end
            
@@ -118,10 +348,12 @@ structure Color : COLOR = struct
            in
                     (simplifyWorkList := NodeSet.delete(!simplifyWorkList, node);
                      selectStack := node :: !selectStack;
+
                      (*let val adjList =  List.foldr (fn (t,l) => l ^ (Temp.makestring (gTemp t)) ^ " ," ) "" (adjnodes)
                       in ErrorMsg.error 0 ("adj nodes of "^(Temp.makestring( (gTemp node)))^" : "^ (adjList))
                      end;*)
-                     List.app (fn n => decrementDegree n) adjnodes )
+                     List.app (fn n => DecrementDegree n) adjnodes )
+
            end 
                        
            
