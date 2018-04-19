@@ -261,7 +261,7 @@ structure Color : COLOR = struct
                                | NONE => (ErrorMsg.error 0 "catastrophic in <Combine>";
                                       MoveSet.empty)
                     fun combineEdges(t) = (
-                        AddEdge(t, u);
+                        Graph.mk_edge{from=t, to=u};
                         DecrementDegree(t)
                         )
                     val deg = case Graph.Table.look(!degree, u)
