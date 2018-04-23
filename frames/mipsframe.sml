@@ -8,6 +8,7 @@ struct
                         nextOffset: int ref,    (* next stack offset    *)
                         parent: int
                         (* other things *)
+                        prologue: Tree.stm
                         }
 
         datatype frag = PROC of {body: Tree.stm, frame: frame}
@@ -94,10 +95,22 @@ struct
                                        else InReg(Temp.newtemp())
                          in acc :: formals2acc(off, flist)
                          end
+                    val forms = formals2acc(off, formals)
+                    fun genPrologue([], _) = T.MOVE(FP, FP)
+                      | genPrologue(acc :: accList, i) =
+                          let val dst = if i < 4 then
+                                                T.TEMP(sub(argregs, i))
+                                        else
+                                                T.MEM(FP + (i * wordSize))
+                          in T.SEQ(T.MOVE(dst, exp acc FP),
+                                   genPrologue(accList, i+1)
+                                )
+                          end
                 in { label=name,
-                     formals=formals2acc(off, formals),
+                     formals=forms,
                      nextOffset=off,
-                     parent=parent}
+                     parent=parent,
+                     prologue = genPrologue(forms)}
                 end
 
         fun allocLocal (f: frame) (esc: bool) =
@@ -116,7 +129,10 @@ struct
         fun externalCall (s, args) =
             Tree.CALL(Tree.NAME(Temp.namedlabel s), args)
 
-        fun procEntryExit1(frame: frame, body: Tree.stm) = body
+        fun procEntryExit1(frame: frame, body: Tree.stm) =
+                T.SEQ( #prologe frame, body )
+
+        fun procEntryExit3() =
 
 end
 
