@@ -78,9 +78,9 @@ structure MipsGen : CODEGEN = struct
 
            | munchStm(T.EXP (T.CALL(T.NAME (n), args))) =
                 let
-                    val calldefs = Frame.RV :: Frame.RA :: Frame.calleesaves
+                    val calldefs = Frame.RV :: Frame.RA :: Frame.callersaves
                 in 
-		    emit(A.OPER {assem = "jal " ^ Symbol.name n ^ "\n", src = munchArgs(0,n, args) , dst= calldefs , jump=NONE}) (*incomplete *)
+		    emit(A.OPER {assem = "jal " ^ Symbol.name n ^ "\n", src = munchArgs(0,n, args, List.length (args)) , dst= calldefs , jump=NONE}) (*incomplete *)
                 end
            | munchStm (T.EXP e)= (munchExp e; ())
 
@@ -131,25 +131,29 @@ structure MipsGen : CODEGEN = struct
                 let
                     val calldefs = Frame.RV :: Frame.RA :: Frame.callersaves
                 in 
-		    emit(A.OPER {assem = "jal " ^ Symbol.name n ^ "\n", src = munchArgs(0,n, args) , dst= calldefs , jump=NONE});
+		    emit(A.OPER {assem = "jal " ^ Symbol.name n ^ "\n", src = munchArgs(0,n, args, List.length (args)) , dst= calldefs , jump=NONE});
                     Frame.RV
                 end
 
-        and munchArgs( i ,n, arg::rest ) =
-  	       ( if i < 4 then
+        and munchArgs( i ,n, arg::rest, num_args ) = 
+                
+  	       ( if i = 0 then
+                    munchStm(T.MOVE(T.TEMP Frame.SP, T.BINOP(T.MINUS, T.TEMP Frame.SP, T.CONST (num_args * Frame.wordSize))))  
+                 else () ;
+                           
+                 if i < 4 then
                      let val reg = List.nth(Frame.argregs, i)
                      in munchStm(T.MOVE( T.TEMP reg , arg )) ;
-                        [reg] @ munchArgs(i+1,n, rest)
+                        [reg] @ munchArgs(i+1,n, rest, num_args)
                      end                  
                  else
-                   (munchStm(T.MOVE(T.MEM(T.TEMP Frame.SP) , arg));
-                    munchStm(T.MOVE(T.TEMP Frame.SP, T.BINOP(T.MINUS, T.TEMP Frame.SP, T.CONST Frame.wordSize)));
-                    nil @ munchArgs(i+1,n, rest)
+                   (munchStm(T.MOVE(T.MEM(T.BINOP(T.MINUS, T.TEMP Frame.SP, T.CONST (i * Frame.wordSize))) , arg));
+                    nil @ munchArgs(i+1,n, rest, num_args)
                     )
                   
                  )
                  
-            | munchArgs(i ,n, [] ) =  ( munchStm(T.MOVE(T.TEMP Frame.FP, T.TEMP Frame.SP)) ; 
+            | munchArgs(i ,n, [], num_args ) =  ( munchStm(T.MOVE(T.TEMP Frame.FP, T.TEMP Frame.SP)) ; 
                                         emit( A.OPER {assem="addi `s0, `s0," ^ Symbol.name n ^"_fs \n", src=[munchExp (T.TEMP Frame.SP)], dst=[], jump=NONE} )
                                         ; [])
 
