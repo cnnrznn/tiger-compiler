@@ -23,11 +23,13 @@ end = struct
 
       (* Show graph needs to be implemented *)
           fun show (out, IGRAPH { graph, tnode, gtemp, moves }) =
+             (TextIO.output(TextIO.stdOut, "\n\n====== Igraph adjacent node info =========\n\n");
             List.app
             ( fn node =>
                TextIO.output ( out , "\n"^Frame.makeString (gtemp node) ^ " : " ^ (List.foldr (fn (n, s) => Frame.makeString (gtemp n) ^ "," ^ s) "" (Graph.adj node)))
-            ) (Graph.nodes graph)           
-
+            ) (Graph.nodes graph) ;          
+             TextIO.output(TextIO.stdOut, "\n\n====== Igraph adjacent nodeh node info =========\n\n"))
+          
 
 
 

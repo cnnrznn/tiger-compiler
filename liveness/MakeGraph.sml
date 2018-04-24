@@ -10,6 +10,7 @@ end = struct
            let
                val nodes = Graph.nodes (#control fg)
            in
+              TextIO.output(out, "\n\n====== COntrol Flow Graph node info =========\n\n");
               List.app
               (fn (n) =>
                   let val defList = case (Graph.Table.look( (#def fg), n)) of SOME l => l
@@ -17,7 +18,7 @@ end = struct
                   in
                       TextIO.output(
                                out,
-                               ( (Graph.nodename n) ^ ": \n" ^
+                               ((Graph.nodename n) ^ ": \n" ^
                                 "def: " ^ ( List.foldl (fn (t,s) => s ^ Frame.makeString t) ""  defList ) ^ "\n" ^
                                 "use: " ^ ( List.foldl (fn (t,s) => s ^ Frame.makeString t) ""  useList ) ^ "\n" ^
                                 "succ: " ^ (  List.foldl (fn (succ_n, s) => s ^ ","^Graph.nodename succ_n  ) "" (Graph.succ n)     ) ^ "\n" ^
@@ -26,7 +27,8 @@ end = struct
                       )
                  end
               )
-              nodes
+              nodes;
+              TextIO.output(out, "\n\n====== COntrol Flow Graph node info _ END =========\n\n")
            end 
 
         fun createNodes([], _) = []
