@@ -1,6 +1,9 @@
 structure MipsFrame : FRAME =
 struct
 
+        structure T = Tree
+        structure A = Assem
+
         datatype access = InFrame of int | InReg of Temp.temp
 
         type frame = {  label: Temp.label,      (* machine code label *)
@@ -98,25 +101,28 @@ struct
                       | formals2acc(off, f :: flist) =
                          let val acc = if f then (off := !off - wordSize;
                                                  InFrame(!off))
-                                       else InReg(Temp.newtemp())
+                                       else (print "\tAllocating new temp for parameter\n";
+                                                InReg(Temp.newtemp()))
                          in acc :: formals2acc(off, flist)
                          end
                     val forms = formals2acc(off, formals)
+
                     fun genPrologue([], _) = Tree.MOVE(Tree.TEMP FP, Tree.TEMP FP)
                       | genPrologue(acc :: accList, i) =
-                          let val dst = if i < 4 then
+                          let val src = if i < 4 then
                                                 Tree.TEMP(List.nth(argregs, i))
                                         else
                                                 Tree.MEM(Tree.BINOP(Tree.PLUS, Tree.TEMP FP, Tree.CONST (i* wordSize)))
-                          in Tree.SEQ(Tree.MOVE(dst, exp (acc) (Tree.TEMP FP)),
+                          in Tree.SEQ(Tree.MOVE(exp (acc) (Tree.TEMP FP), src),
                                    genPrologue(accList, i+1)
                                 )
                           end
+
                 in { label=name,
                      formals=forms,
                      nextOffset=off,
                      parent=parent,
-                     prologue = genPrologue(forms,0)}
+                     prologue = genPrologue(forms, 0)}
                 end
 
         fun allocLocal (f: frame) (esc: bool) =
@@ -132,7 +138,33 @@ struct
             Tree.CALL(Tree.NAME(Temp.namedlabel s), args)
 
         fun procEntryExit1(frame: frame, body: Tree.stm) =
-                Tree.SEQ( #prologue frame, body )
+                let (* 1. allocLocal for every callee saves register? *)
+                    fun createCalleeTemps([]) =
+                            [Temp.newtemp()]            (* allocate one for RA *)
+                      | createCalleeTemps(cs::calleesaves) =
+                            Temp.newtemp() :: createCalleeTemps(calleesaves)
+
+                    val calleeTemps = createCalleeTemps(calleesaves)
+
+                    fun saveCallee(temp :: [], [], t: Tree.stm) =
+                        T.SEQ(T.MOVE(T.TEMP temp, T.TEMP RA),
+                                t)
+                      | saveCallee(temp::tempList, cs::calleeSaves, t: Tree.stm) =
+                        T.SEQ(T.MOVE(T.TEMP temp, T.TEMP cs),
+                                saveCallee(tempList, calleeSaves, t))
+
+                    fun restoreCallee(temp :: [], [], t: Tree.stm) =
+                        T.SEQ(t,
+                                T.MOVE(T.TEMP RA, T.TEMP temp))
+                      | restoreCallee(temp::tempList, cs::calleeSaves, t: Tree.stm) =
+                        T.SEQ(restoreCallee(tempList, calleeSaves, t),
+                                T.MOVE(T.TEMP cs, T.TEMP temp))
+
+                    val newBody = restoreCallee(calleeTemps, calleesaves,
+                                        saveCallee(calleeTemps, calleesaves, body))
+
+                in T.SEQ( #prologue frame, newBody )
+                end
         
         fun procEntryExit2 (frame,body) =
            body @
@@ -140,6 +172,47 @@ struct
                 src=[RA,SP]@calleesaves,
                 dst=[],jump=SOME[]}]
 
+        fun procEntryExit3(frame:frame, instrs) =
+          let val prolog = Symbol.name(#label frame) ^ "\n"
+              val epilog = "\n"
+
+                (* functions to manipulate SP *)
+              fun allocSP (instrs) =
+                      A.OPER{
+                                assem = "addi `s0, `s0, "^ Int.toString(!(#nextOffset frame))
+                                                ^"\n",
+                                dst = [SP],
+                                src = [SP],
+                                jump = NONE } :: instrs
+              fun deallocSP (instrs) =
+                instrs @ [
+                        A.OPER{ assem = "addi `s0, `s0, " ^
+                                                Int.toString(~1 * !(#nextOffset frame))
+                                                ^"\n",
+                                dst = [SP],
+                                src = [SP],
+                                jump = NONE
+                                }
+                        ]
+              fun return(instrs) =
+                instrs @
+                        [A.OPER{ assem = "jr $ra\n",
+                                src = [RA],
+                                dst = [],
+                                jump = NONE }
+                        ]
+
+                (* 1. allocate space on the stack *)
+                (* 2. save callee-save and return address registers *)
+                (* 3. body *)
+                (* 4. load callee-save and return address registers *)
+                (* 5. deallocate stack pointer *)
+                (* 6. jump return *)
+              val body = return(
+                                deallocSP(
+                                allocSP(instrs)))
+          in {prolog=prolog, body=body, epilog=epilog}
+          end
 end
 
 structure Frame = MipsFrame
