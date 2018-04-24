@@ -6,7 +6,7 @@ struct
         type frame = {  label: Temp.label,      (* machine code label *)
                         formals: access list,   (* location of variables *)
                         nextOffset: int ref,    (* next stack offset    *)
-                        parent: int
+                        parent: int,
                         (* other things *)
                         prologue: Tree.stm
                         }
@@ -84,6 +84,12 @@ struct
 
         fun name(f: frame) = #label f
 
+        fun exp (acc:access) (e : Tree.exp) = 
+	    case acc
+	     of InFrame off => Tree.MEM (Tree.BINOP (Tree.PLUS, e, Tree.CONST off))
+              | InReg reg =>  Tree.TEMP reg
+    
+
         fun newFrame{name: Temp.label,
                         formals: bool list,
                         parent: int}: frame =
@@ -96,13 +102,13 @@ struct
                          in acc :: formals2acc(off, flist)
                          end
                     val forms = formals2acc(off, formals)
-                    fun genPrologue([], _) = T.MOVE(FP, FP)
+                    fun genPrologue([], _) = Tree.MOVE(Tree.TEMP FP, Tree.TEMP FP)
                       | genPrologue(acc :: accList, i) =
                           let val dst = if i < 4 then
-                                                T.TEMP(sub(argregs, i))
+                                                Tree.TEMP(List.nth(argregs, i))
                                         else
-                                                T.MEM(FP + (i * wordSize))
-                          in T.SEQ(T.MOVE(dst, exp acc FP),
+                                                Tree.MEM(Tree.BINOP(Tree.PLUS, Tree.TEMP FP, Tree.CONST (i* wordSize)))
+                          in Tree.SEQ(Tree.MOVE(dst, exp (acc) (Tree.TEMP FP)),
                                    genPrologue(accList, i+1)
                                 )
                           end
@@ -110,7 +116,7 @@ struct
                      formals=forms,
                      nextOffset=off,
                      parent=parent,
-                     prologue = genPrologue(forms)}
+                     prologue = genPrologue(forms,0)}
                 end
 
         fun allocLocal (f: frame) (esc: bool) =
@@ -121,18 +127,18 @@ struct
                    else InReg(Temp.newtemp())
                 end
 
-        fun exp (acc:access) (e : Tree.exp) = 
-	    case acc
-	     of InFrame off => Tree.MEM (Tree.BINOP (Tree.PLUS, e, Tree.CONST off))
-              | InReg reg =>  Tree.TEMP reg
-    
+       
         fun externalCall (s, args) =
             Tree.CALL(Tree.NAME(Temp.namedlabel s), args)
 
         fun procEntryExit1(frame: frame, body: Tree.stm) =
-                T.SEQ( #prologe frame, body )
-
-        fun procEntryExit3() =
+                Tree.SEQ( #prologue frame, body )
+        
+        fun procEntryExit2 (frame,body) =
+           body @
+               [Assem.OPER{assem="ppp",
+                src=[RA,SP, FP]@calleesaves,
+                dst=[],jump=SOME[]}]
 
 end
 

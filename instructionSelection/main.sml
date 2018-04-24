@@ -12,7 +12,7 @@ structure Main = struct
 (*         val _ = app (fn s => Printtree.printtree(out,s)) stms; *)
          val stms' = Canon.traceSchedule(Canon.basicBlocks stms)
 	 val instrs =   List.concat(map (MipsGen.codegen frame) stms') 
-
+         val instrs = Frame.procEntryExit2 (frame,instrs)
          (*val (flowGraph, nodeList) = MakeGraph.instrs2graph instrs*)
          (*val (igraph, _) = Liveness.interferenceGraph flowGraph*)
          val (instrs, alloc) =  RegAlloc.alloc (instrs, frame)

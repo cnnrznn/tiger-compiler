@@ -108,7 +108,8 @@ struct
                                                 {label=Temp.newlabel(),
                                                  formals=[],
                                                  nextOffset=ref 4,
-                                                 parent=outermost
+                                                 parent=outermost,
+                                                 prologue = Tree.EXP(Tree.CONST 0)
                                                 })
                     val acc = Frame.allocLocal(frame)(esc)
                 in (lev, acc)
