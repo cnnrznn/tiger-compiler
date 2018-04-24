@@ -140,22 +140,24 @@ struct
         fun procEntryExit1(frame: frame, body: Tree.stm) =
                 let (* 1. allocLocal for every callee saves register? *)
                     fun createCalleeTemps([]) =
-                            [Temp.newtemp()]            (* allocate one for RA *)
+                            [Temp.newtemp(), Temp.newtemp()]    (* allocate one for RA, FP *)
                       | createCalleeTemps(cs::calleesaves) =
                             Temp.newtemp() :: createCalleeTemps(calleesaves)
 
                     val calleeTemps = createCalleeTemps(calleesaves)
 
-                    fun saveCallee(temp :: [], [], t: Tree.stm) =
-                        T.SEQ(T.MOVE(T.TEMP temp, T.TEMP RA),
-                                t)
+                    fun saveCallee(tempRA :: tempFP :: [], [], t: Tree.stm) =
+                        T.SEQ(T.MOVE(T.TEMP tempFP, T.TEMP FP),
+                                T.SEQ(T.MOVE(T.TEMP tempRA, T.TEMP RA),
+                                        t))
                       | saveCallee(temp::tempList, cs::calleeSaves, t: Tree.stm) =
                         T.SEQ(T.MOVE(T.TEMP temp, T.TEMP cs),
                                 saveCallee(tempList, calleeSaves, t))
 
-                    fun restoreCallee(temp :: [], [], t: Tree.stm) =
+                    fun restoreCallee(tempRA :: tempFP :: [], [], t: Tree.stm) =
                         T.SEQ(t,
-                                T.MOVE(T.TEMP RA, T.TEMP temp))
+                                T.SEQ(T.MOVE(T.TEMP FP, T.TEMP tempFP),
+                                        T.MOVE(T.TEMP RA, T.TEMP tempRA)))
                       | restoreCallee(temp::tempList, cs::calleeSaves, t: Tree.stm) =
                         T.SEQ(restoreCallee(tempList, calleeSaves, t),
                                 T.MOVE(T.TEMP cs, T.TEMP temp))
@@ -168,7 +170,8 @@ struct
         
         fun procEntryExit2 (frame,body) =
            body @
-               [Assem.OPER{assem="*******ppp*******\n",
+
+               [Assem.OPER{assem="",
                 src=[RA,SP,FP]@calleesaves,
                 dst=[],jump=SOME[]}]
 
@@ -202,15 +205,21 @@ struct
                                 jump = NONE }
                         ]
 
+                fun label(instrs) =
+                        A.LABEL{
+                                assem = Symbol.name(#label frame) ^ ":\n",
+                                lab = #label frame
+                        } :: instrs
+
                 (* 1. allocate space on the stack *)
                 (* 2. save callee-save and return address registers *)
                 (* 3. body *)
                 (* 4. load callee-save and return address registers *)
                 (* 5. deallocate stack pointer *)
                 (* 6. jump return *)
-              val body = return(
+              val body = label(return(
                                 deallocSP(
-                                allocSP(instrs)))
+                                allocSP(instrs))))
           in {prolog=prolog, body=body, epilog=epilog}
           end
 end
