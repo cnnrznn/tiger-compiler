@@ -7,7 +7,7 @@ sig
 		   moves: (Graph.node * Graph.node) list }
     val interferenceGraph :
         Flow.flowgraph -> igraph * (Graph.node -> Temp.temp list)
-    (*val show : outstream * igraph -> unit *) 
+    val show : TextIO.outstream * igraph -> unit  
 end = struct
  
     (* interference graph datastructure *)
@@ -19,6 +19,17 @@ end = struct
    
     type liveSet = unit Temp.Table.table * Temp.temp list
     type liveMap = liveSet Graph.Table.table
+
+
+      (* Show graph needs to be implemented *)
+          fun show (out, IGRAPH { graph, tnode, gtemp, moves }) =
+            List.app
+            ( fn node =>
+               TextIO.output ( out , Graph.nodename node ^ " : " ^ (List.foldr (fn (n, s) => Graph.nodename n ^ "," ^ s) "" (Graph.adj node)))
+            ) (Graph.nodes graph)           
+
+
+
 
     (* function to initialize the live-in and live-out maps for each node *)
     fun initializeMaps(node :: nodes, liveInMap, liveOutMap ) =
@@ -178,13 +189,7 @@ end = struct
                 SOME (temp, _) => temp
                 | NONE         => (ErrorMsg.error 0 "Error in nodeToTemp" ; Temp.newtemp()) 
           
-           (* Show graph needs to be implemented *)
-          fun show (out, IGRAPH { graph, tnode, gtemp, moves }) =
-            List.app
-            ( fn node =>
-               TextIO.output ( out , Graph.nodename node ^ " : " ^ (List.foldr (fn (n, s) => Graph.nodename n ^ "," ^ s) "" (Graph.adj node)))
-            ) (Graph.nodes graph)           
-
+         
 
            (* function to construct the interference graph   *)
            fun constructGraph(nodes) =

@@ -78,9 +78,9 @@ structure MipsGen : CODEGEN = struct
 
            | munchStm(T.EXP (T.CALL(T.NAME (n), args))) =
                 let
-                    val calldefs = Frame.RV :: Frame.RA :: Frame.callersaves
+                    val calldefs = Frame.RV :: Frame.RA :: Frame.FP::Frame.callersaves
                 in 
-		    emit(A.OPER {assem = "jal " ^ Symbol.name n ^ "\n", src = munchArgs(0,n, args, List.length (args)) , dst= calldefs , jump=NONE}) (*incomplete *)
+		    emit(A.OPER {assem = "jal `s0\n", src = munchExp(T.NAME (n)) :: munchArgs(0,n, args, List.length (args)) , dst= calldefs , jump=NONE}) (*incomplete *)
                 end
            | munchStm (T.EXP e)= (munchExp e; ())
 
@@ -124,14 +124,14 @@ structure MipsGen : CODEGEN = struct
                 result(fn r => emit( A.OPER {assem="li `d0," ^ Int.toString i ^ "\n",src=[] , dst=[r], jump=NONE}))
 
            | munchExp (T.NAME n) =
-      		result(fn r => emit(A.OPER {assem=" la `d0, " ^ Symbol.name n ^ "\n" , src=[] , dst=[r], jump=NONE}))
+      		result(fn r => emit(A.OPER {assem="la `d0, " ^ Symbol.name n ^ "\n" , src=[] , dst=[r], jump=NONE}))
 
            | munchExp(T.TEMP t) = t
            | munchExp(T.CALL(T.NAME (n), args)) =
                 let
-                    val calldefs = Frame.RV :: Frame.RA :: Frame.callersaves
+                    val calldefs = Frame.RV :: Frame.RA:: Frame.FP :: Frame.callersaves
                 in 
-		    emit(A.OPER {assem = "jal " ^ Symbol.name n ^ "\n", src = munchArgs(0,n, args, List.length (args)) , dst= calldefs , jump=NONE});
+		    emit(A.OPER {assem = "jal  `s0 \n", src = munchExp(T.NAME (n))::munchArgs(0,n, args, List.length (args)) , dst= calldefs , jump=NONE});
                     Frame.RV
                 end
 
