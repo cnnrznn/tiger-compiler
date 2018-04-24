@@ -151,6 +151,8 @@ structure Color : COLOR = struct
                    SOME d => if d >= k then
                                  spillWorkList := NodeSet.add(!spillWorkList, node)
                          
+                             else if MoveRelated(node) then
+                                freezeWorkList := NodeSet.add(!freezeWorkList, node)
                              else
                                 ( simplifyWorkList := NodeSet.add(!simplifyWorkList, node);
                                  ())
@@ -170,9 +172,9 @@ structure Color : COLOR = struct
                 end
 
         fun EnableMoves([]) = ()
-        fun EnableMoves(n::nodes) =
+          | EnableMoves(n::nodes) =
                 let fun forEachMove([]) = ()
-                    fun forEachMove(m::moves) =
+                      | forEachMove(m::moves) =
                         if MoveSet.member(!activeMoves, m) then
                                 (activeMoves := MoveSet.delete(!activeMoves, m);
                                 moveWorkList := MoveSet.add(!moveWorkList, m))
