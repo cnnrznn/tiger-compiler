@@ -460,11 +460,14 @@ and transFunHed(tenv, venv, [], _) =
                         )
                 | NONE => T.UNIT
                 )
-          fun params2bools([]) = []
+          fun params2bools([]) : bool list = []
+            | params2bools({name, escape, typ, pos} :: rest) =
+                !escape :: params2bools(rest)
+
           val newlabel = Temp.newlabel()
           val venv' = S.enter(venv, name, FunEnt{level=Translate.newLevel{parent=level,
                                                                           name=newlabel,
-                                                                          formals=[]},
+                                                                          formals=params2bools(params)},
                                                  label=newlabel,
                                                  params=params2types(params),
                                                  res=resTy(result)})
@@ -473,21 +476,21 @@ and transFunHed(tenv, venv, [], _) =
 
 and transFunBod(tenv, venv, A.FunctionDec [], _, doneLabel) = ()
   | transFunBod(tenv, venv, A.FunctionDec({name=name, params=paramsAbsyn, result=result, body=body, pos=pos}::fundecs), level: Translate.level, doneLabel) =
-        let fun params2venv(venv, []) = venv
-              | params2venv(venv, {name, escape, typ, pos}::params) = (
+        let fun params2venv(venv, [], _) = venv
+              | params2venv(venv, {name, escape, typ, pos}::params, acc::accList) = (
                         params2venv(S.enter(venv, name,
-                                                VarEnt{access=Translate.allocLocal(level)(!escape),
+                                                VarEnt{access=acc,
                                                         ty=(case S.look(tenv, typ)
                                                          of SOME t => t
                                                           | NONE => (
                                                               ErrorMsg.error pos "unexpected error finding local variable type";
                                                               T.INT))}),
-                                        params)
+                                        params, accList)
               )
         in
         ((case S.look(venv, name)
          of SOME(FunEnt{level=bodyLev, label=_, params=parambools, res=res}) =>
-                        (let val venv' = params2venv(venv, paramsAbsyn)
+                        (let val venv' = params2venv(venv, paramsAbsyn, List.drop(Translate.formals(bodyLev), 1))
                              val {exp=expBody, ty=_} = transExp(tenv, venv', body, bodyLev, doneLabel)
                         in Translate.procEntryExit{level=bodyLev, bodyExp=expBody}
                         end;

@@ -50,6 +50,8 @@ sig
 
         val printTree: exp -> unit
         val printTreeSTM: Tree.stm -> unit
+
+        val frameFormals: level -> Frame.access list
 end
 
 structure Translate : TRANSLATE =
@@ -122,6 +124,12 @@ struct
                                         (level, formal) :: makeList(level, formals)
                               in makeList(level, #formals frame)
                               end
+                  | NONE => (ErrorMsg.error 0 "should never see this";
+                                [])
+
+        fun frameFormals level : Frame.access list =
+                case Table.look(!HT, level)
+                 of SOME frame => #formals frame
                   | NONE => (ErrorMsg.error 0 "should never see this";
                                 [])
 
