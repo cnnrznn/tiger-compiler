@@ -93,7 +93,7 @@ end = struct
                                               SOME u => u
                     val succ_n = Graph.succ node
                     val outList_dups = List.foldr (fn (s,l) => 
-							let val (_, inList) = case Graph.Table.look (liveInMap, node) of
+							let val (_, inList) = case Graph.Table.look (liveInMap, s) of
                                                                               SOME m => m
                                                         in inList @ l
                                                         end ) [] succ_n

@@ -114,7 +114,7 @@ end = struct
             val newFg = populateFG(instrs, nodes, fg)
         in createEdges(instrs, nodes, instrs, nodes, newFg);
            (*printNodes(nodes); *) 
-           (*show(TextIO.stdOut, newFg);*)
+           show(TextIO.stdOut, newFg);
            (newFg, nodes)
         end
 end

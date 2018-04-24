@@ -13,12 +13,12 @@ structure Main = struct
          val stms' = Canon.traceSchedule(Canon.basicBlocks stms)
 	 val instrs =   List.concat(map (MipsGen.codegen frame) stms') 
          val instrs = Frame.procEntryExit2 (frame,instrs)
-         (*val (flowGraph, nodeList) = MakeGraph.instrs2graph instrs*)
-         (*val (igraph, _) = Liveness.interferenceGraph flowGraph*)
+         
          val (instrs, alloc) =  RegAlloc.alloc (instrs, frame)
          val {prolog=prolg, body=instrs, epilog=epilg} = Frame.procEntryExit3(frame, instrs)
          val alloc_list = List.map (fn (k,v) => Temp.makestring k ^" , " ^ v ^ "\n") (IntBinaryMap.listItemsi(alloc))
          val format0 = Assem.format(F.makeString)
+
       in print "==========================================\n";
          (*Translate.printTreeSTM body; *)
          print "*************************\n";

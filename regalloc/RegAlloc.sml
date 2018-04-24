@@ -19,9 +19,9 @@ structure RegAlloc : REG_ALLOC = struct
             val (flowGraph, nodeList) = MakeGraph.instrs2graph instrs
             val (igraph, fgTempMap) = Liveness.interferenceGraph flowGraph
              (**** Debugging purposes ****)
-            (*val dummy = List.app (fn n =>  let val temps = List.foldr (fn (t,l) => l ^ (Temp.makestring t) ^ " ," ) "" (fgTempMap n)
+             val dummy = List.app (fn n =>  let val temps = List.foldr (fn (t,l) => l ^ (Temp.makestring t) ^ " ," ) "" (fgTempMap n)
                                             in  ErrorMsg.error 0  ((Graph.nodename n) ^":"^ temps)
-                                            end) (Graph.nodes (#control flowGraph)) *)
+                                            end) (Graph.nodes (#control flowGraph)) 
            
             val (color_alloc, spillNodes) = Color.color {
                                                       interference=igraph,

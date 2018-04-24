@@ -171,7 +171,7 @@ struct
         fun procEntryExit2 (frame,body) =
            body @
 
-               [Assem.OPER{assem="",
+               [Assem.OPER{assem="ppp---",
                 src=[RA,SP,FP]@calleesaves,
                 dst=[],jump=SOME[]}]
 
