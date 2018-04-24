@@ -153,8 +153,7 @@ structure MipsGen : CODEGEN = struct
                   
                  )
                  
-            | munchArgs(i ,n, [], num_args ) =  ( munchStm(T.MOVE(T.TEMP Frame.FP, T.TEMP Frame.SP)) ; 
-                                        emit( A.OPER {assem="addi `s0, `s0," ^ Symbol.name n ^"_fs \n", src=[munchExp (T.TEMP Frame.SP)], dst=[], jump=NONE} )
+            | munchArgs(i ,n, [], num_args ) =  ( munchStm(T.MOVE(T.TEMP Frame.FP, T.TEMP Frame.SP))
                                         ; [])
 
    in munchStm stm;
