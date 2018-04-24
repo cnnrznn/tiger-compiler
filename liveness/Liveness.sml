@@ -25,7 +25,7 @@ end = struct
           fun show (out, IGRAPH { graph, tnode, gtemp, moves }) =
             List.app
             ( fn node =>
-               TextIO.output ( out , Graph.nodename node ^ " : " ^ (List.foldr (fn (n, s) => Graph.nodename n ^ "," ^ s) "" (Graph.adj node)))
+               TextIO.output ( out , "\n"^Frame.makeString (gtemp node) ^ " : " ^ (List.foldr (fn (n, s) => Frame.makeString (gtemp n) ^ "," ^ s) "" (Graph.adj node)))
             ) (Graph.nodes graph)           
 
 
@@ -234,6 +234,7 @@ end = struct
                     end
              in
                  List.app addEdges nodes;
+                 show(TextIO.stdOut, IGRAPH {graph = graph, tnode = tempToNode, gtemp= nodeToTemp, moves = !moves });
                  (IGRAPH {graph = graph, tnode = tempToNode, gtemp= nodeToTemp, moves = !moves },
                  fn n => case Graph.Table.look(liveOutMap, n)
                           of SOME (_, templist) => templist)

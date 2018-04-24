@@ -19,7 +19,7 @@ structure Main = struct
          val alloc_list = List.map (fn (k,v) => Temp.makestring k ^" , " ^ v ^ "\n") (IntBinaryMap.listItemsi(alloc))
          val format0 = Assem.format(F.makeString)
       in print "==========================================\n";
-         Translate.printTreeSTM body;
+         (*Translate.printTreeSTM body; *)
          print "*************************\n";
          app (fn i => TextIO.output(TextIO.stdOut,format0 i)) instrs;
          print "*************************\n";
