@@ -17,12 +17,19 @@ structure Main = struct
          val (instrs, alloc) =  RegAlloc.alloc (instrs, frame)
          val {prolog=prolg, body=instrs, epilog=epilg} = Frame.procEntryExit3(frame, instrs)
          val alloc_list = List.map (fn (k,v) => Temp.makestring k ^" , " ^ v ^ "\n") (IntBinaryMap.listItemsi(alloc))
-         val format0 = Assem.format(F.makeString)
+
+
+         fun getAllocatedRegister alloc t =
+             case Temp.Table.look(alloc,t) of
+             SOME(c) => c
+             | NONE => Frame.makeString t
+
+         val format0 = Assem.format(getAllocatedRegister alloc)
 
       in print "==========================================\n";
          (*Translate.printTreeSTM body; *)
          print "*************************\n";
-         (*app (fn i => TextIO.output(TextIO.stdOut,format0 i)) instrs;*)
+        (* app (fn i => TextIO.output(TextIO.stdOut,format0 i)) instrs; *)
          print "*************************\n";
          TextIO.output (TextIO.stdOut,  "\n*** register allocation *** \n");
          app (fn i => TextIO.output(TextIO.stdOut, i^ "  ")) alloc_list;

@@ -120,10 +120,11 @@ structure Color : COLOR = struct
                                     end
                                 )
                     )
-                    moves
+                    moves;
+            makeMoveWorkList moves
                 )
 
-        fun makeMoveWorkList([]) = ()
+        and makeMoveWorkList([]) = ()
           | makeMoveWorkList(m::moves) = (
                 moveWorkList := MoveSet.add(!moveWorkList, m);
                 makeMoveWorkList(moves)
@@ -354,9 +355,9 @@ structure Color : COLOR = struct
                     (simplifyWorkList := NodeSet.delete(!simplifyWorkList, node);
                      selectStack := node :: !selectStack;
 
-                    (* let val adjList =  List.foldr (fn (t,l) => l ^ (Frame.makeString (gTemp t)) ^ " ," ) "" (adjnodes)
+                     let val adjList =  List.foldr (fn (t,l) => l ^ (Frame.makeString (gTemp t)) ^ " ," ) "" (adjnodes)
                       in TextIO.output ( TextIO.stdOut ,"\n\n adj nodes of "^(Frame.makeString( (gTemp node)))^" : "^ (adjList))
-                     end; *)
+                     end;
                      List.app (fn n => DecrementDegree n) adjnodes )
 
            end 
@@ -415,7 +416,7 @@ structure Color : COLOR = struct
           if not (NodeSet.isEmpty(!simplifyWorkList)) then 
              (simplify(); repeatFunc())
           else if not (NodeSet.isEmpty(!spillWorkList) ) then 
-              (selectSpill() ; repeatFunc())
+              (TextIO.output ( TextIO.stdOut , "\n\n entereted here"); selectSpill() ; repeatFunc())
           else ()
     in
        build();
@@ -423,8 +424,9 @@ structure Color : COLOR = struct
        makeWorkList(NodeSet.listItems(!initial));
        TextIO.output ( TextIO.stdOut , "\n\n number of nodes in simplify worklist : "^Int.toString( NodeSet.numItems(!simplifyWorkList))); 
        repeatFunc();
-      
+       TextIO.output ( TextIO.stdOut , "\n\n repeatFunc end" );
        List.app (fn (n) => assignColors(n)) (!selectStack);
+       TextIO.output ( TextIO.stdOut , "\n\n assigncolors  end" );
        (*ErrorMsg.error 0 ("number of spilled nodes " ^ Int.toString( NodeSet.numItems(!spilledNodes))); *)
        ( !color ,  List.map (fn (n) => gTemp n) (NodeSet.listItems(!spilledNodes)) )
     end
