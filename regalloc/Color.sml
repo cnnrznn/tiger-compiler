@@ -72,8 +72,11 @@ structure Color : COLOR = struct
                 in List.exists findNode adj
                 end
 
+        fun getAdjNodes node = 
+           NodeSet.listItems(NodeSet.addList(NodeSet.empty, Graph.adj node))  
+            
         fun degreeof (node) =
-            List.length (Graph.adj(node))   
+            List.length (getAdjNodes(node))   
 
         val degree = List.foldr (fn (n, t)  => ref ( Graph.Table.enter (!t, n, degreeof n )) ) (ref Graph.Table.empty) (Graph.nodes graph)
         val color : allocation ref = ref Temp.Table.empty
@@ -346,14 +349,14 @@ structure Color : COLOR = struct
            let
               
                val node = List.hd ( NodeSet.listItems(!simplifyWorkList))
-               val adjnodes = Graph.adj(node)
+               val adjnodes = getAdjNodes(node)
            in
                     (simplifyWorkList := NodeSet.delete(!simplifyWorkList, node);
                      selectStack := node :: !selectStack;
 
-                     (*let val adjList =  List.foldr (fn (t,l) => l ^ (Temp.makestring (gTemp t)) ^ " ," ) "" (adjnodes)
-                      in ErrorMsg.error 0 ("adj nodes of "^(Temp.makestring( (gTemp node)))^" : "^ (adjList))
-                     end;*)
+                    (* let val adjList =  List.foldr (fn (t,l) => l ^ (Frame.makeString (gTemp t)) ^ " ," ) "" (adjnodes)
+                      in TextIO.output ( TextIO.stdOut ,"\n\n adj nodes of "^(Frame.makeString( (gTemp node)))^" : "^ (adjList))
+                     end; *)
                      List.app (fn n => DecrementDegree n) adjnodes )
 
            end 
@@ -361,7 +364,7 @@ structure Color : COLOR = struct
            
        fun assignColors(node) =
            let 
-              val adjlist = Graph.adj node
+              val adjlist = getAdjNodes node
               val okColors = RegSet.addList( RegSet.empty , registers)
               val u = NodeSet.union(!coloredNodes, !precoloredNodes)
            in
@@ -416,9 +419,9 @@ structure Color : COLOR = struct
           else ()
     in
        build();
-       (*ErrorMsg.error 0 (Int.toString( NodeSet.numItems(!initial)));*)
+       TextIO.output ( TextIO.stdOut , "\n\n number of nodes in initial worklist :"^ Int.toString( NodeSet.numItems(!initial)));
        makeWorkList(NodeSet.listItems(!initial));
-       (*ErrorMsg.error 0 (Int.toString( NodeSet.numItems(!simplifyWorkList))); *) 
+       TextIO.output ( TextIO.stdOut , "\n\n number of nodes in simplify worklist : "^Int.toString( NodeSet.numItems(!simplifyWorkList))); 
        repeatFunc();
       
        List.app (fn (n) => assignColors(n)) (!selectStack);

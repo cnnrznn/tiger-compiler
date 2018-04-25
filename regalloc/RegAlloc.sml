@@ -19,11 +19,11 @@ structure RegAlloc : REG_ALLOC = struct
             val (flowGraph, nodeList) = MakeGraph.instrs2graph instrs
             val (igraph, fgTempMap) = Liveness.interferenceGraph flowGraph
              (**** Debugging purposes ****)
-             val dummy = (TextIO.output(TextIO.stdOut, "\n\n====== Liveout for Control Flow Graph node info =========\n\n");
-                         List.app (fn n =>  let val temps = List.foldr (fn (t,l) => l ^ (Temp.makestring t) ^ " ," ) "" (fgTempMap n)
+            (* val dummy = (TextIO.output(TextIO.stdOut, "\n\n====== Liveout for Control Flow Graph node info =========\n\n");
+                         List.app (fn n =>  let val temps = List.foldr (fn (t,l) => l ^ (Frame.makeString t) ^ " ," ) "" (fgTempMap n)
                                             in TextIO.output( TextIO.stdOut,  ((Graph.nodename n) ^":  "^ temps ^ "\n") )
                                             end) (Graph.nodes (#control flowGraph)) ;
-                         TextIO.output(TextIO.stdOut, "\n\n====== Liveout for Control Flow Graph node info- END =========\n\n") )
+                         TextIO.output(TextIO.stdOut, "\n\n====== Liveout for Control Flow Graph node info- END =========\n\n") ) *)
            
             val (color_alloc, spillNodes) = Color.color {
                                                       interference=igraph,
