@@ -121,12 +121,9 @@ structure Color : COLOR = struct
                                 )
                     )
                     moves;
-<<<<<<< HEAD
-            makeMoveWorkList moves
-=======
 
                     makeMoveWorkList(moves)
->>>>>>> 1de6bb1fce37d04f027d5cfc23cd702547cf7bd2
+
                 )
 
         and makeMoveWorkList([]) = ()
@@ -369,9 +366,9 @@ structure Color : COLOR = struct
                     (simplifyWorkList := NodeSet.delete(!simplifyWorkList, node);
                      selectStack := node :: !selectStack;
 
-                     let val adjList =  List.foldr (fn (t,l) => l ^ (Frame.makeString (gTemp t)) ^ " ," ) "" (adjnodes)
-                      in TextIO.output ( TextIO.stdOut ,"\n\n adj nodes of "^(Frame.makeString( (gTemp node)))^" : "^ (adjList))
-
+                    (* let val adjList =  List.foldr (fn (t,l) => l ^ (Frame.makeString (gTemp t)) ^ " ," ) "" (adjnodes)
+                     in TextIO.output ( TextIO.stdOut ,"\n\n adj nodes of "^(Frame.makeString( (gTemp node)))^" : "^ (adjList))
+                     end *)
                      List.app (fn n => DecrementDegree n) (NodeSet.listItems(Adjacent(node))) )
 
 
