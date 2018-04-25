@@ -120,10 +120,12 @@ structure Color : COLOR = struct
                                     end
                                 )
                     )
-                    moves
+                    moves;
+
+                    makeMoveWorkList(moves)
                 )
 
-        fun makeMoveWorkList([]) = ()
+        and makeMoveWorkList([]) = ()
           | makeMoveWorkList(m::moves) = (
                 moveWorkList := MoveSet.add(!moveWorkList, m);
                 makeMoveWorkList(moves)
@@ -132,7 +134,7 @@ structure Color : COLOR = struct
         fun NodeMoves(n) =
                 let val mln = case Graph.Table.look(!moveList, n)
                                of SOME set => set
-                                | NONE => (ErrorMsg.error 0 "fatal in <MoveRelated()>";
+                                | NONE => (ErrorMsg.error 0 "fatal in <NodeMoves>";
                                                 MoveSet.empty)
                 in
                    MoveSet.intersection(
@@ -178,10 +180,11 @@ structure Color : COLOR = struct
           | EnableMoves(n::nodes) =
                 let fun forEachMove([]) = ()
                       | forEachMove(m::moves) =
-                        if MoveSet.member(!activeMoves, m) then
-                                (activeMoves := MoveSet.delete(!activeMoves, m);
-                                moveWorkList := MoveSet.add(!moveWorkList, m))
-                        else ()
+                                (if MoveSet.member(!activeMoves, m) then
+                                        (activeMoves := MoveSet.delete(!activeMoves, m);
+                                        moveWorkList := MoveSet.add(!moveWorkList, m))
+                                else ();
+                                forEachMove(moves))
                 in
                     forEachMove(MoveSet.listItems(NodeMoves(n)));
                     EnableMoves(nodes)
@@ -215,11 +218,18 @@ structure Color : COLOR = struct
                 end
 
         and AddWorkList(u) =
-                if not(NodeSet.member(!precoloredNodes, u)) andalso not(MoveRelated(u))
-                                 then
-                        (freezeWorkList := NodeSet.delete(!freezeWorkList, u);
-                        simplifyWorkList := NodeSet.add(!simplifyWorkList, u))
-                else ()
+                let val deg = case Graph.Table.look(!degree, u)
+                                of SOME d => d
+                                 | NONE => (ErrorMsg.error 0 "catastrophic in <AddWorkList>";
+                                            0)
+                in
+                        if not(NodeSet.member(!precoloredNodes, u)) andalso not(MoveRelated(u)) andalso
+                                        deg < K
+                                         then
+                                (freezeWorkList := NodeSet.delete(!freezeWorkList, u);
+                                simplifyWorkList := NodeSet.add(!simplifyWorkList, u))
+                        else ()
+                end
 
         and allOK(nodes, u) =
                 List.all (fn t => OK(t, u)) 
@@ -292,6 +302,8 @@ structure Color : COLOR = struct
                    in moveList := Graph.Table.enter(!moveList, u, MoveSet.union(set1, set2))
                    end;
 
+                   EnableMoves([v]);
+
                    List.app combineEdges (NodeSet.listItems(Adjacent(v)));
                    if deg >= K andalso (NodeSet.member(!freezeWorkList, u)) then
                         (freezeWorkList := NodeSet.delete(!freezeWorkList, u);
@@ -349,7 +361,6 @@ structure Color : COLOR = struct
            let
               
                val node = List.hd ( NodeSet.listItems(!simplifyWorkList))
-               val adjnodes = getAdjNodes(node)
            in
                     (simplifyWorkList := NodeSet.delete(!simplifyWorkList, node);
                      selectStack := node :: !selectStack;
@@ -357,7 +368,7 @@ structure Color : COLOR = struct
                     (* let val adjList =  List.foldr (fn (t,l) => l ^ (Frame.makeString (gTemp t)) ^ " ," ) "" (adjnodes)
                       in TextIO.output ( TextIO.stdOut ,"\n\n adj nodes of "^(Frame.makeString( (gTemp node)))^" : "^ (adjList))
                      end; *)
-                     List.app (fn n => DecrementDegree n) adjnodes )
+                     List.app (fn n => DecrementDegree n) (NodeSet.listItems(Adjacent(node))) )
 
            end 
                        
@@ -369,12 +380,15 @@ structure Color : COLOR = struct
               val u = NodeSet.union(!coloredNodes, !precoloredNodes)
            in
               let
-                  val remColors = List.foldr (fn (a,c) => if NodeSet.member(u, a) then
-                                                             case Temp.Table.look(!color, (gTemp a)) of
+                  val remColors = List.foldr (fn (a,c) => 
+                                                let val w = GetAlias(a)
+                                                in if NodeSet.member(u, w) then
+                                                             case Temp.Table.look(!color, (gTemp w)) of
                                                                  SOME colr => RegSet.delete(c, colr)
                                                                 |NONE => (ErrorMsg.error 0 "Error in assignColors" ; c)
                                                               
-                                                          else c ) okColors adjlist
+                                                          else c 
+                                                end) okColors adjlist
                                                          
               in 
              
@@ -405,8 +419,9 @@ structure Color : COLOR = struct
                 val spillNode = chooseSpill(List.hd (NodeSet.listItems(!spillWorkList)), NodeSet.listItems(!spillWorkList))
             in
                 spillWorkList := NodeSet.delete(!spillWorkList, spillNode);
-                simplifyWorkList := NodeSet.add(!simplifyWorkList, spillNode)  
-                (* freeze MOves *)                    
+                simplifyWorkList := NodeSet.add(!simplifyWorkList, spillNode);
+                (* freeze MOves *)
+                FreezeMoves(spillNode)
                    
            end
 
@@ -414,6 +429,10 @@ structure Color : COLOR = struct
        fun repeatFunc() =
           if not (NodeSet.isEmpty(!simplifyWorkList)) then 
              (simplify(); repeatFunc())
+          else if not (MoveSet.isEmpty(!moveWorkList)) then
+                (Coalesce(); repeatFunc())
+          else if not (NodeSet.isEmpty(!freezeWorkList)) then
+                (Freeze(); repeatFunc())
           else if not (NodeSet.isEmpty(!spillWorkList) ) then 
               (selectSpill() ; repeatFunc())
           else ()
@@ -423,8 +442,19 @@ structure Color : COLOR = struct
        makeWorkList(NodeSet.listItems(!initial));
        TextIO.output ( TextIO.stdOut , "\n\n number of nodes in simplify worklist : "^Int.toString( NodeSet.numItems(!simplifyWorkList))); 
        repeatFunc();
+
+       print("repeatFunc\n");
       
        List.app (fn (n) => assignColors(n)) (!selectStack);
+
+       List.app (fn (n) => let val m = GetAlias(n)
+                           in color := Temp.Table.enter(!color, gTemp n, 
+                                                case Temp.Table.look(!color, gTemp m)
+                                                 of SOME c => c
+                                                  | NONE => ("woops"))
+                           end
+                ) (NodeSet.listItems(!coalescedNodes));
+
        (*ErrorMsg.error 0 ("number of spilled nodes " ^ Int.toString( NodeSet.numItems(!spilledNodes))); *)
        ( !color ,  List.map (fn (n) => gTemp n) (NodeSet.listItems(!spilledNodes)) )
     end
