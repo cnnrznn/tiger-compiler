@@ -21,8 +21,8 @@ structure Main = struct
 
          fun getAllocatedRegister alloc t =
              case Temp.Table.look(alloc,t) of
-             SOME(c) => c
-             | NONE => Frame.makeString t
+             SOME(c) => "$"^c
+             | NONE => "$" ^ (Frame.makeString t)
 
          val format0 = Assem.format(getAllocatedRegister alloc)
 

@@ -82,12 +82,30 @@ structure RegAlloc : REG_ALLOC = struct
                          end
                       end
                     | rewriteProgram([], allInstrs) = allInstrs
+        
+             fun isDupMove(instr) =
+                  case instr of
+                     A.MOVE {assem = assem, src = src, dst=dst} => 
+                        let val srcReg = case Temp.Table.look(color_alloc, src) of 
+                                         SOME r => r
+                                         |NONE => (ErrorMsg.error 0 "fatal in remove Dup moves"; "")
+                            val dstReg = case Temp.Table.look(color_alloc, dst) of 
+                                         SOME r => r
+                                         |NONE => (ErrorMsg.error 0 "fatal in remove Dup moves"; "")
+                        in
+                             if String.compare(srcReg, dstReg) = EQUAL then
+                                  true
+                             else 
+                                  false
+                        end  
+                     | _ => false
+                      
              
                              
         in
             
            case spillNodes of
-             [] => (instrs, color_alloc) 
+             [] => let val newInstrs = List.filter (fn i => not(isDupMove i)) instrs  in (newInstrs, color_alloc) end
              |temps => ( let val newAssemInstrs = rewriteProgram (spillNodes, instrs) in  alloc(newAssemInstrs, frame) end)
             
         end    

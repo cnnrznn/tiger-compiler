@@ -78,7 +78,7 @@ structure MipsGen : CODEGEN = struct
 
            | munchStm(T.EXP (T.CALL(T.NAME (n), args))) =
                 let
-                    val calldefs = Frame.RV :: Frame.RA :: Frame.FP::Frame.callersaves
+                    val calldefs = Frame.RV :: Frame.RA ::Frame.callersaves
                 in 
 		    emit(A.OPER {assem = "jal `s0\n", src = munchExp(T.NAME (n)) :: munchArgs(0,n, args, List.length (args)) , dst= calldefs , jump=NONE}) (*incomplete *)
                 end
@@ -129,7 +129,7 @@ structure MipsGen : CODEGEN = struct
            | munchExp(T.TEMP t) = t
            | munchExp(T.CALL(T.NAME (n), args)) =
                 let
-                    val calldefs = Frame.RV :: Frame.RA:: Frame.FP :: Frame.callersaves
+                    val calldefs = Frame.RV :: Frame.RA :: Frame.callersaves
                 in 
 		    emit(A.OPER {assem = "jal  `s0 \n", src = munchExp(T.NAME (n))::munchArgs(0,n, args, List.length (args)) , dst= calldefs , jump=NONE});
                     Frame.RV

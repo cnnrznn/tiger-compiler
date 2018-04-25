@@ -65,7 +65,7 @@ struct
 
         val tempMap =
           let       
-             val regList = [(RV, "RV"), (SP, "SP"),(FP, "FP"),(RA, "RA"),
+             val regList = [(RV, "v1"), (SP, "sp"),(FP, "fp"),(RA, "ra"),
                              (a0, "a0"), (a1, "a1"), (a2, "a2"), (a3, "a3"),
 			     (s0, "s0"), (s1, "s1"), (s2, "s2"), (s3, "s3"), (s4, "s4"), (s5, "s5"), (s6, "s6"), (s7, "s7"),
 			     (t0, "t0"), (t1, "t1"), (t2, "t2"), (t3, "t3"), (t4, "t4"), (t5, "t5"), (t6, "t6"), (t7, "t7"), (t8, "t8"), (t9, "t9")]
@@ -171,7 +171,7 @@ struct
         fun procEntryExit2 (frame,body) =
            body @
 
-               [Assem.OPER{assem="ppp---",
+               [Assem.OPER{assem="",
                 src=[RA,SP,FP]@calleesaves,
                 dst=[],jump=SOME[]}]
 
