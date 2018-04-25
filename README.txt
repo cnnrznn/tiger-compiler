@@ -35,7 +35,8 @@ Some other functions implemented are
 
 run instructions:
 
-We included a run.sml and sources.cm in the .tar file.
+We included sources.cm, factorial.tig and the corresponding assembly program factorial.tig.s in the .tar file.
+We also have a run.sml to compile the .tig files
 
 1. cd tiger-compiler/
 2. sml run.sml
