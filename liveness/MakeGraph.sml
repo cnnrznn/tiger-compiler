@@ -6,6 +6,7 @@ end = struct
 
         structure A = Assem
   
+        (* function which takes a control flow graph and prints out the node info *)
         fun show (out, fg : Flow.flowgraph) =
            let
                val nodes = Graph.nodes (#control fg)
@@ -115,7 +116,7 @@ end = struct
             val nodes = createNodes(instrs, #control fg)
             val newFg = populateFG(instrs, nodes, fg)
         in createEdges(instrs, nodes, instrs, nodes, newFg);
-           (*printNodes(nodes); *) 
+       
            show(TextIO.stdOut, newFg);
            (newFg, nodes)
         end

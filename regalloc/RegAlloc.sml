@@ -18,12 +18,14 @@ structure RegAlloc : REG_ALLOC = struct
         let
             val (flowGraph, nodeList) = MakeGraph.instrs2graph instrs
             val (igraph, fgTempMap) = Liveness.interferenceGraph flowGraph
+
              (**** Debugging purposes ****)
-            (* val dummy = (TextIO.output(TextIO.stdOut, "\n\n====== Liveout for Control Flow Graph node info =========\n\n");
-                         List.app (fn n =>  let val temps = List.foldr (fn (t,l) => l ^ (Frame.makeString t) ^ " ," ) "" (fgTempMap n)
-                                            in TextIO.output( TextIO.stdOut,  ((Graph.nodename n) ^":  "^ temps ^ "\n") )
-                                            end) (Graph.nodes (#control flowGraph)) ;
-                         TextIO.output(TextIO.stdOut, "\n\n====== Liveout for Control Flow Graph node info- END =========\n\n") ) *)
+            fun showLiveout(liveOutMap : (Graph.node -> Temp.temp list)) =  
+              (TextIO.output(TextIO.stdOut, "\n\n====== Liveout for Control Flow Graph node info =========\n\n");
+               List.app (fn n =>  let val temps = List.foldr (fn (t,l) => l ^ (Frame.makeString t) ^ " ," ) "" (liveOutMap n)
+                                  in TextIO.output( TextIO.stdOut,  ((Graph.nodename n) ^":  "^ temps ^ "\n") )
+                                  end) (Graph.nodes (#control flowGraph)) ;
+              TextIO.output(TextIO.stdOut, "\n\n====== Liveout for Control Flow Graph node info- END =========\n\n") )
            
             val (color_alloc, spillNodes) = Color.color {
                                                       interference=igraph,
@@ -32,7 +34,7 @@ structure RegAlloc : REG_ALLOC = struct
                                                       registers=Frame.registers
                                                       }    
 
-          
+                  (* function to rewrite the assembly instructions in case of spilling *)
                   fun rewriteProgram(node:: nodes, allInstrs) =
                       let 
                           val acc = Frame.allocLocal (frame) (true)  
@@ -83,6 +85,7 @@ structure RegAlloc : REG_ALLOC = struct
                       end
                     | rewriteProgram([], allInstrs) = allInstrs
         
+             (* function to identify moves where src and destination are same *)
              fun isDupMove(instr) =
                   case instr of
                      A.MOVE {assem = assem, src = src, dst=dst} => 
@@ -103,7 +106,7 @@ structure RegAlloc : REG_ALLOC = struct
              
                              
         in
-            
+             
            case spillNodes of
              [] => let val newInstrs = List.filter (fn i => not(isDupMove i)) instrs  in (newInstrs, color_alloc) end
              |temps => ( let val newAssemInstrs = rewriteProgram (spillNodes, instrs) in  alloc(newAssemInstrs, frame) end)

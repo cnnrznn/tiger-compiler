@@ -21,7 +21,7 @@ end = struct
     type liveMap = liveSet Graph.Table.table
 
 
-      (* Show graph needs to be implemented *)
+          (* Show graph needs to be implemented *)
           fun show (out, IGRAPH { graph, tnode, gtemp, moves }) =
              (TextIO.output(TextIO.stdOut, "\n\n====== Igraph adjacent node info =========\n\n");
             List.app

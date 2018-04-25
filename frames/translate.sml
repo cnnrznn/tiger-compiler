@@ -331,7 +331,7 @@ struct
        fun recordExp(fieldList) = 
            let val r = Temp.newtemp()
            in  Ex(T.ESEQ(
-                        T.SEQ(T.MOVE(T.TEMP r, Frame.externalCall("initRecord", [T.CONST(Frame.wordSize * length fieldList  )])),
+                        T.SEQ(T.MOVE(T.TEMP r, Frame.externalCall("allocRecord", [T.CONST(Frame.wordSize * length fieldList  )])),
                               recursiveRecord(fieldList , r, 0)),
                         T.TEMP r))
            end
